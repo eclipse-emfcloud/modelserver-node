@@ -51,11 +51,10 @@ import { hideBin } from 'yargs/helpers';
 
 async function loadModules(): Promise<ContainerModule[]> {
     const modules = [
-        '@eclipse-emfcloud/coffee-custom-commands-example/lib/example-commands-module',
-        '@eclipse-emfcloud/coffee-custom-validators-example/lib/example-validators-module'
+        require('@eclipse-emfcloud/coffee-custom-commands-example/lib/example-commands-module'),
+        require('@eclipse-emfcloud/coffee-custom-validators-example/lib/example-validators-module')
     ];
 
-    // eslint-disable @typescript-eslint/no-var-requires
-    const required = modules.map(path => require(path)).map(module => module.default);
-    return Promise.resolve(required);
+    const result = modules.map(module => module.default);
+    return Promise.resolve(result);
 }
