@@ -1,0 +1,30 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Start Example Server",
+      "program": "${workspaceRoot}/examples/example-server/lib/app.js",
+      "args": ["--port=8082", "--upstream=8081", "--verbose"],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/packages/server/lib/**/*.js",
+        "${workspaceFolder}/packages/modelserver-plugin-ext/lib/**/*.js",
+        "${workspaceFolder}/examples/custom-command-example/lib/**/*.js",
+        "${workspaceFolder}/examples/custom-validator-example/lib/**/*.js",
+        "${workspaceFolder}/examples/example-server/lib/**/*.js"
+      ],
+      "smartStep": true,
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
+      "outputCapture": "std"
+    }
+  ]
+}

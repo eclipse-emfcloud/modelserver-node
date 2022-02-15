@@ -1,0 +1,50 @@
+{
+  "name": "@eclipse-emfcloud/coffee-custom-commands-example",
+  "version": "0.1.0",
+  "description": "Example custom command plug-in for the Model Server.",
+  "license": "(EPL-2.0 OR MIT)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eclipse-emfcloud/modelserver-node.git"
+  },
+  "homepage": "https://www.eclipse.org/emfcloud/",
+  "bugs": "https://github.com/eclipse-emfcloud/modelserver-node/issues",
+  "contributors": [
+    {
+      "name": "STMicroelectronics",
+      "url": "https://www.st.com/"
+    },
+    {
+      "name": "Eclipse emf.cloud Project",
+      "email": "emfcloud-dev@eclipse.org",
+      "url": "https://projects.eclipse.org/projects/ecd.emfcloud"
+    }
+  ],
+  "files": [
+    "lib"
+  ],
+  "dependencies": {
+    "@eclipse-emfcloud/modelserver-plugin-ext": "~0.1.0",
+    "inversify": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/reflect-metadata": "^0.1.0",
+    "eslint-config-prettier": "^8.3.0",
+    "reflect-metadata": "^0.1.13",
+    "rimraf": "^2.6.1",
+    "typescript": "^3.9.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepare": "yarn clean && yarn build",
+    "clean": "rimraf lib",
+    "lint": "eslint --ext .ts,.tsx ./src",
+    "lint:fix": "eslint --fix --ext .ts,.tsx ./src",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "publish:latest": "yarn publish --tag latest",
+    "publish:next": "yarn publish --new-version \"$(semver $npm_package_version -i minor)-next.$(git rev-parse --short HEAD)\" --tag next"
+  }
+}
