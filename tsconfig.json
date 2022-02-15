@@ -1,0 +1,8 @@
+{
+  "extends": "./configs/base.tsconfig",
+  "compilerOptions": {
+    "baseUrl": "."
+  },
+  "include": ["examples/*/src", "packages/*/src"],
+  "exclude": ["**/node_modules", "**/*.spec.ts"]
+}

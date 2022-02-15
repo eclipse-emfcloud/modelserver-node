@@ -1,0 +1,38 @@
+{
+  "private": true,
+  "engines": {
+    "yarn": ">=1.7.0 <2.x.x",
+    "node": ">=12.14.1 <13"
+  },
+  "scripts": {
+    "prepare": "lerna run prepare",
+    "build": "lerna run build",
+    "lint": "lerna run lint",
+    "lint:fix": "lerna run lint:fix",
+    "watch": "lerna run --parallel watch",
+    "test": "lerna run test",
+    "start": "yarn --cwd examples/example-server start",
+    "publish": "yarn && yarn publish:latest",
+    "publish:latest": "lerna publish",
+    "publish:next": "lerna publish --exact --canary=next --npm-tag=next --yes"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.4.0",
+    "@typescript-eslint/parser": "^5.4.0",
+    "eslint": "^8.3.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-simple-import-sort": "^7.0.0",
+    "eslint-plugin-header": "^3.1.1",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-no-null": "^1.0.2",
+    "eslint-plugin-prettier": "^4.0.0",
+    "lerna": "^4.0.0",
+    "prettier": "^2.4.1",
+    "rimraf": "^2.6.1",
+    "typescript": "^3.9.2"
+  },
+  "workspaces": [
+    "examples/*",
+    "packages/*"
+  ]
+}
