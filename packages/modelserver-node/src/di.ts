@@ -33,11 +33,10 @@ export async function createContainer(modelServerPort: number, loggingLevel: Log
 }
 
 async function loadModules(): Promise<ContainerModule[]> {
-    const modules = ['./logging-module', './server-module', './routes/routing-module'];
+    const modules = [require('./logging-module'), require('./server-module'), require('./routes/routing-module')];
 
-    // eslint-disable @typescript-eslint/no-var-requires
-    const required = modules.map(path => require(path)).map(module => module.default);
-    return Promise.resolve(required);
+    const result = modules.map(module => module.default);
+    return Promise.resolve(result);
 }
 
 function modelServerModule(modelServerPort: number): ContainerModule {
