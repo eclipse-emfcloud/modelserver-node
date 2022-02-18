@@ -5,6 +5,7 @@ Plug-in contributions are supported for
 
 - custom command providers
 - validation providers
+- trigger providers that add side-effects to edit requests
 
 ## Setup
 

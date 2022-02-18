@@ -18,6 +18,7 @@ import { BasicModelServerPluginContext, InternalModelServerPluginContext } from 
 import { ModelServer } from './server';
 import { SubscriptionManager } from './services/subscription-manager';
 import { ValidationManager } from './services/validation-manager';
+import { TriggerProviderRegistry } from './trigger-provider-registry';
 import { ValidationProviderRegistry } from './validation-provider-registry';
 
 export default new ContainerModule(bind => {
@@ -25,6 +26,7 @@ export default new ContainerModule(bind => {
     bind(InternalModelServerClientApi).to(InternalModelServerClient).inSingletonScope();
 
     bind(CommandProviderRegistry).toSelf().inSingletonScope();
+    bind(TriggerProviderRegistry).toSelf().inSingletonScope();
     bind(ValidationProviderRegistry).toSelf().inSingletonScope();
 
     bind(SubscriptionManager).toSelf().inSingletonScope();

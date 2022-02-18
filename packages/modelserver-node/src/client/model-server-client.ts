@@ -26,7 +26,7 @@ import {
     SubscriptionOptions,
     TypeGuard
 } from '@eclipse-emfcloud/modelserver-client';
-import { Executor, Logger, ModelServerClientApi } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Executor, Logger, ModelServerClientApi, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import axios from 'axios';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
@@ -34,6 +34,7 @@ import { v4 as uuid } from 'uuid';
 import * as WebSocket from 'ws';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
+import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -155,6 +156,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     @inject(CommandProviderRegistry)
     protected readonly commandProviderRegistry: CommandProviderRegistry;
 
+    @inject(TriggerProviderRegistry)
+    protected readonly triggerProviderRegistry: TriggerProviderRegistry;
+
     @inject(UpstreamConnectionConfig)
     protected readonly upstreamConnectionConfig: UpstreamConnectionConfig;
 
@@ -175,7 +179,13 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
 
         return axios.post(this.makeURL('transaction', { modeluri: modelURI }), { data: clientID }).then(response => {
             const { uri: transactionURI } = (response.data as CreateTransactionResponseBody).data;
-            const result = new DefaultTransactionContext(transactionURI, modelURI, this.commandProviderRegistry, this.logger);
+            const result = new DefaultTransactionContext(
+                transactionURI,
+                modelURI,
+                this.commandProviderRegistry,
+                this.triggerProviderRegistry,
+                this.logger
+            );
             return result.open(tc => this.closeTransaction(modelURI, tc));
         });
     }
@@ -327,6 +337,10 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     }
 }
 
+interface NestedEditContext {
+    aggregatedUpdateResult: ModelUpdateResult;
+}
+
 /**
  * Default implementation of the client-side transaction context with socket message handling.
  */
@@ -335,12 +349,13 @@ class DefaultTransactionContext implements TransactionContext {
 
     private socket: WebSocket;
 
-    private nestedContexts: ModelUpdateResult[] = [];
+    private nestedContexts: NestedEditContext[] = [];
 
     constructor(
         protected readonly transactionURI: string,
         protected readonly modelURI: string,
         protected readonly commandProviderRegistry: CommandProviderRegistry,
+        protected readonly triggerProviderRegistry: TriggerProviderRegistry,
         protected readonly logger: Logger
     ) {
         // Ensure that asynchronous functions don't lose their 'this' context
@@ -383,6 +398,14 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     async applyPatch(patch: Operation | Operation[]): Promise<ModelUpdateResult> {
+        if (!this.socket) {
+            return Promise.reject('Socket is closed.');
+        }
+
+        return this.sendPatch(patch);
+    }
+
+    private async sendPatch(patch: Operation | Operation[]): Promise<ModelUpdateResult> {
         return this.sendExecuteMessage({
             type: 'modelserver.patch',
             data: patch
@@ -394,8 +417,11 @@ class DefaultTransactionContext implements TransactionContext {
             return Promise.reject('Socket is closed.');
         }
 
-        // is this a custom command that we are executing?
-        if (this.commandProviderRegistry.hasProvider(command.type)) {
+        // Hook in command-provider plug-ins
+        if (!this.commandProviderRegistry.hasProvider(command.type)) {
+            // Not handled. Send along to the Model Server
+            return this.sendCommand(command);
+        } else {
             this.logger.debug(`Getting commands provided recursively for ${command.type}`);
 
             const provided = await this.commandProviderRegistry.getCommands(command);
@@ -413,10 +439,8 @@ class DefaultTransactionContext implements TransactionContext {
                 if (ModelServerCommand.is(provided)) {
                     return this.sendCommand(provided);
                 }
-                return this.applyPatch(provided);
+                return this.sendPatch(provided);
             }
-        } else {
-            return this.sendCommand(command);
         }
     }
 
@@ -432,7 +456,7 @@ class DefaultTransactionContext implements TransactionContext {
             return Promise.reject('Socket is closed.');
         }
 
-        const current = this.peekNestedContext();
+        const { aggregatedUpdateResult: current } = this.peekNestedContext();
         const result = WebSocketMessageAcceptor.promise<ModelUpdateResult>(this.socket, message => {
             const matched = message.type === 'success' && Operations.isPatch(message.data.patch);
             if (matched && current) {
@@ -453,8 +477,8 @@ class DefaultTransactionContext implements TransactionContext {
      */
     private pushNestedContext(): boolean {
         const resultMessage = { type: MessageType.success, data: { patch: [] } };
-        const updateAggregator: ModelUpdateResult = MessageDataMapper.patchModel(resultMessage);
-        return this.nestedContexts.push(updateAggregator) === 1;
+        const aggregatedUpdateResult: ModelUpdateResult = MessageDataMapper.patchModel(resultMessage);
+        return this.nestedContexts.push({ aggregatedUpdateResult }) === 1;
     }
 
     /**
@@ -462,7 +486,7 @@ class DefaultTransactionContext implements TransactionContext {
      *
      * @returns the current nested execution context
      */
-    private peekNestedContext(): ModelUpdateResult | undefined {
+    private peekNestedContext(): NestedEditContext | undefined {
         if (this.nestedContexts.length) {
             return this.nestedContexts[this.nestedContexts.length - 1];
         }
@@ -476,16 +500,16 @@ class DefaultTransactionContext implements TransactionContext {
      * @returns the popped nested execution context
      */
     private popNestedContext(): ModelUpdateResult {
-        const result = this.nestedContexts.pop();
-        const current = this.peekNestedContext();
-        if (current) {
-            this.mergeModelUpdateResult(current, result);
+        const { aggregatedUpdateResult: result } = this.nestedContexts.pop();
+        const currentContext = this.peekNestedContext();
+        if (currentContext) {
+            this.mergeModelUpdateResult(currentContext.aggregatedUpdateResult, result);
         }
         return result;
     }
 
     private mergeModelUpdateResult(dst: ModelUpdateResult, src?: ModelUpdateResult): void {
-        if (src?.patch) {
+        if (src?.patch && src.patch.length) {
             dst.patch = (dst.patch ?? []).concat(src.patch);
         }
     }
@@ -497,6 +521,16 @@ class DefaultTransactionContext implements TransactionContext {
             return transactionClosed;
         }
 
+        let modelDelta = updateResult.patch;
+        while (modelDelta && modelDelta.length) {
+            const triggers = await this.triggerProviderRegistry.getTriggers(this.modelURI, modelDelta);
+            if (triggers) {
+                const triggerResult = await this.performTriggers(triggers);
+                this.mergeModelUpdateResult(updateResult, triggerResult);
+                modelDelta = triggerResult.patch;
+            }
+        }
+
         this.socket.send(JSON.stringify(this.message('close')));
         return updateResult;
     }
@@ -506,6 +540,26 @@ class DefaultTransactionContext implements TransactionContext {
             this.socket.send(JSON.stringify(this.message('roll-back', { error })));
         }
         return transactionClosed;
+    }
+
+    /**
+     * Perform `triggers` to update the model in consequence of changes that have been performed
+     * by the transaction context that we are closing.
+     *
+     * @param triggers the triggers to apply to the model
+     * @returns a new model update result describing the changes performed by the `triggers`
+     */
+    async performTriggers(triggers: Operation[] | Transaction): Promise<ModelUpdateResult> {
+        // Start a nested transaction context
+        this.pushNestedContext();
+
+        if (typeof triggers === 'function') {
+            await triggers(this);
+        } else {
+            await this.applyPatch(triggers);
+        }
+
+        return this.popNestedContext();
     }
 
     protected message(type: MessageBody['type'], data: unknown = {}): MessageBody {
