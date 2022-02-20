@@ -8,7 +8,7 @@
     "rootDir": "src",
     "outDir": "lib",
     "baseUrl": ".",
-    "types": ["node", "reflect-metadata"]
+    "types": ["node", "reflect-metadata", "mocha", "chai"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "**/*.spec.ts"]

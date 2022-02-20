@@ -337,7 +337,16 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     }
 }
 
+/**
+ * A context tracking the state of transactions while nested transactions are in progress.
+ * Edit transactions for custom commands and triggers can be recursive: custom command transactions can execute
+ * other custom commands and trigger patches can trigger further updates.
+ * The `NestedEditContext` tracks the state of a parent transaction while a child transaction is in progress
+ * so that when the child completes, its state can be appended to the parent state.
+ * If a child transaction fails, its state is discarded.
+ */
 interface NestedEditContext {
+    /** The aggregate of edits reported so far on the model by the upstream _Model Server_. */
     aggregatedUpdateResult: ModelUpdateResult;
 }
 
@@ -365,6 +374,12 @@ class DefaultTransactionContext implements TransactionContext {
         this.rollback = this.rollback.bind(this);
     }
 
+    /**
+     * Open a new transaction on the upstream _Model Server_.
+     *
+     * @param closeCallback a call-back to invoke when the transaction is closed, for example to clean up associated bookkeeping
+     * @returns a new transaction context
+     */
     open(closeCallback: (tc: TransactionContext) => void): Promise<TransactionContext> {
         const result: Promise<TransactionContext> = new Promise((resolve, reject) => {
             this.closeCallback = closeCallback;
@@ -374,7 +389,6 @@ class DefaultTransactionContext implements TransactionContext {
             const socket = new WebSocket(wsURI.toString());
 
             socket.onclose = event => {
-                // this.subscriptionClient.onClosed(event, modelUri);
                 this.closeCallback.apply(this);
                 this.socket = undefined;
             };
@@ -383,7 +397,6 @@ class DefaultTransactionContext implements TransactionContext {
                 resolve(this);
             };
             socket.onmessage = event => {
-                // TODO: user call-back for the incremental update messages
                 this.logger.debug(`Message: ${event.data}`);
             };
             socket.onerror = event => {
@@ -397,6 +410,7 @@ class DefaultTransactionContext implements TransactionContext {
         return result;
     }
 
+    // Doc inherited from `Executor` interface
     async applyPatch(patch: Operation | Operation[]): Promise<ModelUpdateResult> {
         if (!this.socket) {
             return Promise.reject('Socket is closed.');
@@ -412,6 +426,7 @@ class DefaultTransactionContext implements TransactionContext {
         });
     }
 
+    // Doc inherited from `Executor` interface
     async execute(command: ModelServerCommand): Promise<ModelUpdateResult> {
         if (!this.socket) {
             return Promise.reject('Socket is closed.');
@@ -508,12 +523,19 @@ class DefaultTransactionContext implements TransactionContext {
         return result;
     }
 
+    /**
+     * Merge an additional model update result into a destination aggregation results.
+     *
+     * @param dst the model update result into which to merge an additional result
+     * @param src an addition model update result, if any, to merge into the destination
+     */
     private mergeModelUpdateResult(dst: ModelUpdateResult, src?: ModelUpdateResult): void {
         if (src?.patch && src.patch.length) {
             dst.patch = (dst.patch ?? []).concat(src.patch);
         }
     }
 
+    // Doc inherited from `TransactionContext` interface
     async close(): Promise<ModelUpdateResult> {
         const updateResult = this.popNestedContext();
 
@@ -535,6 +557,7 @@ class DefaultTransactionContext implements TransactionContext {
         return updateResult;
     }
 
+    // Doc inherited from `TransactionContext` interface
     async rollback(error: any): Promise<ModelUpdateResult> {
         if (this.socket) {
             this.socket.send(JSON.stringify(this.message('roll-back', { error })));
@@ -562,6 +585,13 @@ class DefaultTransactionContext implements TransactionContext {
         return this.popNestedContext();
     }
 
+    /**
+     * Assemble a message to send to the upstream _Model Server_.
+     *
+     * @param type the message type
+     * @param data the payload of the message
+     * @returns the message body
+     */
     protected message(type: MessageBody['type'], data: unknown = {}): MessageBody {
         return {
             type,
