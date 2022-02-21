@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 import { CommandProvider } from './command-provider';
+import { TriggerProvider } from './trigger-provider';
 import { MaybePromise } from './util';
 import { ValidationProvider } from './validation-provider';
 
@@ -33,12 +34,27 @@ export const ModelServerPluginContext = Symbol('ModelServerPluginContext');
  */
 export interface ModelServerPluginContext {
     /**
-     * Register a provider of a custom command type.
+     * Register a provider of a custom command type. Multiple providers may register
+     * for the same type. One provider that reports that it can handle a specific
+     * instance of that command type will be called upon to handle it.
      *
-     * @param commandType the command type supported by the provider
-     * @param provider the provider of the command
+     * Primitive set, add, and remove commands cannot be provided for.
+     *
+     * @param commandType the custom command type supported by the provider
+     * @param provider the provider of the custom command
+     * @returns a registration token to use to cancel the registration when appropriate
+     *
+     * @throws if the `commandType` is one of the primitive command types
      */
     registerCommandProvider(commandType: string, provider: CommandProvider): Registration<string, CommandProvider>;
+
+    /**
+     * Register a provider of triggers.
+     *
+     * @param provider the trigger provider to register
+     * @returns a registration token to use to cancel the registration when appropriate
+     */
+    registerTriggerProvider(provider: TriggerProvider): Registration<string, TriggerProvider>;
 
     /**
      * Register a provider of custom model validation rules.
@@ -46,6 +62,7 @@ export interface ModelServerPluginContext {
      *
      * @param provider the validation provider
      * @param options registration options, primarily for filtering
+     * @returns a registration token to use to cancel the registration when appropriate
      */
     registerValidationProvider(
         provider: ValidationProvider,

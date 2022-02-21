@@ -15,12 +15,14 @@ import {
     ModelServerPlugin,
     ModelServerPluginContext,
     Registration,
+    TriggerProvider,
     ValidationProvider,
     ValidationProviderRegistrationOptions
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, multiInject, named } from 'inversify';
 
 import { CommandProviderRegistry } from './command-provider-registry';
+import { TriggerProviderRegistry } from './trigger-provider-registry';
 import { ValidationProviderRegistry } from './validation-provider-registry';
 
 interface InitializationResult {
@@ -51,6 +53,9 @@ export class BasicModelServerPluginContext implements InternalModelServerPluginC
     @inject(CommandProviderRegistry)
     protected commandProviderRegistry: CommandProviderRegistry;
 
+    @inject(TriggerProviderRegistry)
+    protected triggerProviderRegistry: TriggerProviderRegistry;
+
     @inject(ValidationProviderRegistry)
     protected validationProviderRegistry: ValidationProviderRegistry;
 
@@ -71,6 +76,15 @@ export class BasicModelServerPluginContext implements InternalModelServerPluginC
             key: commandType,
             service: provider,
             unregister: () => this.commandProviderRegistry.unregister(commandType, provider)
+        };
+    }
+
+    registerTriggerProvider(provider: TriggerProvider): Registration<string, TriggerProvider> {
+        const key = this.triggerProviderRegistry.register(provider);
+        return {
+            key,
+            service: provider,
+            unregister: () => this.triggerProviderRegistry.unregister(key, provider)
         };
     }
 

@@ -9,8 +9,9 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 
-import { ModelServerCommand } from '@eclipse-emfcloud/modelserver-client';
+import { AddCommand, ModelServerCommand, RemoveCommand, SetCommand } from '@eclipse-emfcloud/modelserver-client';
 import { CommandProvider, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
 
 /**
@@ -24,14 +25,22 @@ export class CommandProviderRegistry {
 
     protected providers: Map<string, CommandProvider[]> = new Map();
 
+    protected readonly primitiveCommandTypes = new Set([AddCommand.TYPE, RemoveCommand.TYPE, SetCommand.TYPE]);
+
     /**
      * Register a command provider for a custom command, by type.
      *
      * @param commandType the custom command type for which to register a command provider
      * @param provider the command provider(s) to register
+     *
+     * @throws if the `commandType` is one of the primitive add, set, or remove types
      */
     register(commandType: string, ...provider: CommandProvider[]): void {
         this.logger.debug(`Registering custom ${commandType} command provider`);
+
+        if (this.primitiveCommandTypes.has(commandType)) {
+            throw new Error(`Attempt to register custom command provider for primitive ${commandType} command`);
+        }
 
         const existing = this.getProviders(commandType);
         this.providers.set(commandType, existing.concat(provider));
@@ -76,8 +85,8 @@ export class CommandProviderRegistry {
      * @returns the provided command, command transaction, or the original `customCommand` standing in for itself
      *    if no provider can handle the custom command
      */
-    async getCommands(customCommand: ModelServerCommand): Promise<ModelServerCommand | Transaction> {
-        let result: ModelServerCommand | Transaction | undefined;
+    async getCommands(customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
+        let result: ModelServerCommand | Operation[] | Transaction | undefined;
         const provider = this.getProvider(customCommand);
         if (provider) {
             this.logger.debug(`Invoking provider for custom ${customCommand.type} command`);

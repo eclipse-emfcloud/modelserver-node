@@ -52,7 +52,8 @@ import { hideBin } from 'yargs/helpers';
 async function loadModules(): Promise<ContainerModule[]> {
     const modules = [
         require('@eclipse-emfcloud/coffee-custom-commands-example/lib/example-commands-module'),
-        require('@eclipse-emfcloud/coffee-custom-validators-example/lib/example-validators-module')
+        require('@eclipse-emfcloud/coffee-custom-validators-example/lib/example-validators-module'),
+        require('@eclipse-emfcloud/coffee-triggers-example/lib/example-triggers-module')
     ];
 
     const result = modules.map(module => module.default);

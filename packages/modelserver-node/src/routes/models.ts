@@ -9,21 +9,27 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import {
+    AddCommand,
     AnyObject,
     CompoundCommand,
     encode,
     ModelServerCommand,
+    ModelServerCommandPackage,
     ModelServerObject,
-    ModelUpdateResult
+    ModelUpdateResult,
+    RemoveCommand,
+    SetCommand
 } from '@eclipse-emfcloud/modelserver-client';
-import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Executor, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
+import { Operation } from 'fast-json-patch';
 import { ServerResponse } from 'http';
 import { inject, injectable, named } from 'inversify';
 
 import { ExecuteMessageBody, InternalModelServerClientApi, TransactionContext } from '../client/model-server-client';
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { ValidationManager } from '../services/validation-manager';
+import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { handleError, relay, respondError, RouteProvider, RouterFactory, validateFormat } from './routes';
 
 /**
@@ -59,6 +65,9 @@ export class ModelsRoutes implements RouteProvider {
 
     @inject(CommandProviderRegistry)
     protected readonly commandProviderRegistry: CommandProviderRegistry;
+
+    @inject(TriggerProviderRegistry)
+    protected readonly triggerProviderRegistry: TriggerProviderRegistry;
 
     @inject(ValidationManager)
     protected readonly validationManager: ValidationManager;
@@ -121,12 +130,7 @@ export class ModelsRoutes implements RouteProvider {
 
             const message = req.body?.data;
             if (message && ExecuteMessageBody.isPatch(message)) {
-                // Just pass JSON patches through. There's nothing to interpret.
-                this.modelServerClient
-                    .edit(modelURI, message.data)
-                    .then(this.performPatchValidation(modelURI))
-                    .then(relay(res))
-                    .catch(handleError(res));
+                return this.forwardEdit(modelURI, message.data, res);
             }
 
             const command = asModelServerCommand(message?.data);
@@ -135,29 +139,95 @@ export class ModelsRoutes implements RouteProvider {
                 return;
             }
 
-            this.logger.debug(`Getting commands provided for ${command.type}`);
-
-            const provided = await this.commandProviderRegistry.getCommands(command);
-            if (typeof provided === 'function') {
-                // It's a transaction function
-                this.modelServerClient
-                    .openTransaction(modelURI)
-                    .then(ctx =>
-                        provided(ctx)
-                            .then(completeTransaction(ctx, res))
-                            .then(this.performPatchValidation(modelURI))
-                            .catch(error => ctx.rollback(error).finally(() => respondError(res, error)))
-                    )
-                    .catch(handleError(res));
-            } else {
-                // It's a substitute command. Just execute it in the usual way
-                this.modelServerClient
-                    .edit(modelURI, provided)
-                    .then(this.performPatchValidation(modelURI))
-                    .then(relay(res))
-                    .catch(handleError(res));
-            }
+            return isCustomCommand(command) ? this.handleCommand(modelURI, command, res) : this.forwardEdit(modelURI, command, res);
         };
+    }
+
+    protected async handleCommand(modelURI: string, command: ModelServerCommand, res: Response<any, Record<string, any>>): Promise<void> {
+        this.logger.debug(`Getting commands provided for ${command.type}`);
+
+        const provided = await this.commandProviderRegistry.getCommands(command);
+        this.forwardEdit(modelURI, provided, res);
+    }
+
+    protected forwardEdit(
+        modelURI: string,
+        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
+        res: Response<any, Record<string, any>>
+    ): void {
+        if (this.triggerProviderRegistry.hasProviders()) {
+            return this.forwardEditWithTriggers(modelURI, providedEdit, res);
+        }
+        return this.forwardEditSimple(modelURI, providedEdit, res);
+    }
+
+    private forwardEditSimple(
+        modelURI: string,
+        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
+        res: Response<any, Record<string, any>>
+    ): void {
+        if (typeof providedEdit === 'function') {
+            // It's a transaction function
+            this.modelServerClient
+                .openTransaction(modelURI)
+                .then(ctx =>
+                    providedEdit(ctx)
+                        .then(completeTransaction(ctx, res))
+                        .then(this.performPatchValidation(modelURI))
+                        .catch(error => ctx.rollback(error).finally(() => respondError(res, error)))
+                )
+                .catch(handleError(res));
+        } else {
+            // It's a substitute command or JSON Patch. Just execute/apply it in the usual way
+            let result: Promise<ModelUpdateResult>;
+
+            if (ModelServerCommand.is(providedEdit)) {
+                // Command case
+                result = this.modelServerClient.edit(modelURI, providedEdit);
+            } else {
+                // JSON Patch case
+                result = this.modelServerClient.edit(modelURI, providedEdit);
+            }
+
+            result.then(this.performPatchValidation(modelURI)).then(relay(res)).catch(handleError(res));
+        }
+    }
+
+    private forwardEditWithTriggers(
+        modelURI: string,
+        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
+        res: Response<any, Record<string, any>>
+    ): void {
+        let result = true;
+
+        // Perform the edit in a transaction, then gather triggers, and recurse
+        const triggeringTransaction = async (executor: Executor): Promise<boolean> => {
+            if (typeof providedEdit === 'function') {
+                // It's a transaction function
+                result = await providedEdit(executor);
+            } else {
+                // It's a command or JSON Patch. Just execute/apply it in the usual way
+                if (ModelServerCommand.is(providedEdit)) {
+                    // Command case
+                    await executor.execute(providedEdit);
+                } else {
+                    // JSON Patch case
+                    await executor.applyPatch(providedEdit);
+                }
+            }
+
+            return result;
+        };
+
+        this.modelServerClient
+            .openTransaction(modelURI)
+            .then(ctx =>
+                triggeringTransaction(ctx)
+                    .then(completeTransaction(ctx, res)) // The transaction context performs the triggers
+                    .then(this.performPatchValidation(modelURI))
+                    .catch(error => ctx.rollback(error).finally(() => respondError(res, error)))
+            )
+            .catch(handleError(res));
     }
 
     /**
@@ -185,7 +255,7 @@ export class ModelsRoutes implements RouteProvider {
             if (validate.success) {
                 return validator.performLiveValidation(modelURI).then(() => validate);
             }
-            this.logger.debug('Not validating the failed command.');
+            this.logger.debug('Not validating the failed command/patch.');
             return validate;
         };
     }
@@ -203,40 +273,55 @@ function asModel(object: any): AnyObject | string | undefined {
 }
 
 /**
- * Ensure that a custom command parsed from incoming JSON is a proper instance of the
- * {@link ModelServerCommand} or {@link CompoundCommand} class. Note that custom commands
- * cannot be of any other command API class because they all have known types that we do not intercept.
- * This ensures that, for example, methods of the `ModelServerCommand` class are available on
- * the command object.
+ * Ensure that a command parsed from incoming JSON is a proper instance of the
+ * {@link ModelServerCommand} or {@link CompoundCommand} class.
+ * This ensures that, for example, methods of the `ModelServerCommand` class
+ * are available on the command object.
  *
- * @param customCommand a custom command
- * @returns the custom command as a proper instance of the {@link ModelServerCommand} class
+ * @param command a command
+ * @returns the command as a proper instance of the {@link ModelServerCommand} class
+ *   or a subclass
  */
-function asModelServerCommand(customCommand: any): ModelServerCommand | undefined {
-    if (customCommand) {
+function asModelServerCommand(command: any): ModelServerCommand | undefined {
+    if (command) {
         // The client uses json-v2 format exclusively for commands/patches
-        customCommand = encode('json')(customCommand);
+        command = encode('json')(command);
     }
 
-    if (isModelServerCommand(customCommand) && !(customCommand instanceof ModelServerCommand)) {
-        Object.setPrototypeOf(customCommand, ModelServerCommand.prototype);
-        return customCommand as ModelServerCommand;
-    }
-    if (isCompoundCommand(customCommand) && !(customCommand instanceof CompoundCommand)) {
-        Object.setPrototypeOf(customCommand, CompoundCommand.prototype);
-        return customCommand as CompoundCommand;
+    if (!(command instanceof ModelServerCommand) && isModelServerCommand(command)) {
+        let proto: typeof ModelServerCommand.prototype;
+
+        switch (command.eClass) {
+            case AddCommand.URI:
+                proto = AddCommand.prototype;
+                break;
+            case RemoveCommand.URI:
+                proto = RemoveCommand.prototype;
+                break;
+            case SetCommand.URI:
+                proto = SetCommand.prototype;
+                break;
+            case CompoundCommand.URI:
+                proto = CompoundCommand.prototype;
+                break;
+            default:
+                proto = ModelServerCommand.prototype;
+                break;
+        }
+
+        Object.setPrototypeOf(command, proto);
+        return command as ModelServerCommand;
     }
 
     return undefined;
 }
 
 function isModelServerCommand(object: any): object is ModelServerCommand {
-    return ModelServerObject.is(object) && object.eClass === ModelServerCommand.URI;
+    return ModelServerObject.is(object) && object.eClass.startsWith(ModelServerCommandPackage.NS_URI + '#//');
 }
 
-function isCompoundCommand(object: any): object is CompoundCommand {
-    // The CompoundCommand.is(...) function is too specific, not recognizing custom types
-    return ModelServerObject.is(object) && object.eClass === CompoundCommand.URI;
+function isCustomCommand(command: ModelServerCommand): boolean {
+    return !(SetCommand.is(command) || AddCommand.is(command) || RemoveCommand.is(command));
 }
 
 /**
