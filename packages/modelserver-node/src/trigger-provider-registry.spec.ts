@@ -83,13 +83,15 @@ describe('TriggerProviderRegistry', () => {
             expect(trigger).to.be.a('function');
 
             const transaction = trigger as Transaction;
+            const counter = new AsyncCounter();
             const executor = sinon.spy({
-                execute: (command: ModelServerCommand) => Promise.resolve({ success: true }),
-                applyPatch: (patch: Operation | Operation[]) => Promise.resolve({ success: true })
+                execute: async (command: ModelServerCommand) => counter.tick({ success: true }),
+                applyPatch: async (patch: Operation | Operation[]) => counter.tick({ success: true })
             });
 
             await transaction(executor);
 
+            expect(counter.count).to.be.equal(2);
             assert(executor.applyPatch.calledWith(sinon.match.every(sinon.match({ path: '/foo/bar/name' }))));
             assert(executor.applyPatch.calledWith(sinon.match.every(sinon.match({ path: '/foo/bar/things/2' }))));
         });
@@ -100,4 +102,20 @@ function registerProviders(registry: TriggerProviderRegistry, ...providers: Trig
     const registrations = providers.map(provider => ({ id: registry.register(provider), provider }));
 
     return () => registrations.forEach(reg => registry.unregister(reg.id, reg.provider));
+}
+
+class AsyncCounter {
+    count: number = 0;
+
+    async tick<T>(action?: T | (() => T)): Promise<T | undefined> {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                this.count = this.count + 1;
+                if (typeof action === 'function') {
+                    resolve((action as Function)());
+                }
+                return resolve(action as T);
+            }, 5);
+        });
+    }
 }

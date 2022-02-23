@@ -416,6 +416,10 @@ class DefaultTransactionContext implements TransactionContext {
             return Promise.reject('Socket is closed.');
         }
 
+        if (!patch || (Array.isArray(patch) && patch.length === 0)) {
+            return { success: false };
+        }
+
         return this.sendPatch(patch);
     }
 
@@ -546,7 +550,10 @@ class DefaultTransactionContext implements TransactionContext {
         let modelDelta = updateResult.patch;
         while (modelDelta && modelDelta.length) {
             const triggers = await this.triggerProviderRegistry.getTriggers(this.modelURI, modelDelta);
-            if (triggers) {
+            if (!this.hasTriggers(triggers)) {
+                // Nothing left to process
+                modelDelta = undefined;
+            } else {
                 const triggerResult = await this.performTriggers(triggers);
                 this.mergeModelUpdateResult(updateResult, triggerResult);
                 modelDelta = triggerResult.patch;
@@ -555,6 +562,10 @@ class DefaultTransactionContext implements TransactionContext {
 
         this.socket.send(JSON.stringify(this.message('close')));
         return updateResult;
+    }
+
+    hasTriggers(triggers: Operation[] | Transaction): boolean {
+        return triggers && (typeof triggers === 'function' || triggers.length > 0);
     }
 
     // Doc inherited from `TransactionContext` interface
@@ -573,16 +584,22 @@ class DefaultTransactionContext implements TransactionContext {
      * @returns a new model update result describing the changes performed by the `triggers`
      */
     async performTriggers(triggers: Operation[] | Transaction): Promise<ModelUpdateResult> {
+        let result: ModelUpdateResult;
+
         // Start a nested transaction context
         this.pushNestedContext();
 
-        if (typeof triggers === 'function') {
-            await triggers(this);
-        } else {
-            await this.applyPatch(triggers);
+        try {
+            if (typeof triggers === 'function') {
+                await triggers(this);
+            } else {
+                await this.applyPatch(triggers);
+            }
+        } finally {
+            result = this.popNestedContext();
         }
 
-        return this.popNestedContext();
+        return result;
     }
 
     /**
