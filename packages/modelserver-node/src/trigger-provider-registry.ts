@@ -136,8 +136,8 @@ function multiTriggerProvider(triggerProviders: TriggerProvider[]): TriggerProvi
                     if (!result) {
                         break;
                     }
-                } else {
-                    executor.applyPatch(provided);
+                } else if (provided.length) {
+                    result = (await executor.applyPatch(provided)).success;
                 }
             }
 
