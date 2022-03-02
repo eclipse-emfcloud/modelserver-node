@@ -24,7 +24,7 @@ spec:
       readOnly: false
     - name: global-cache
       mountPath: /.cache     
-    - name: global-npmdeploy-emfcloud-modelserver-node
+    - name: global-npm
       mountPath: /.npm      
   volumes:
   - name: "jenkins-home"
@@ -42,7 +42,7 @@ pipeline {
         kubernetes {
             label 'emfcloud-agent-pod'
             yaml kubernetes_config
-        }deploy-emfcloud-modelserver-node
+        }
     }
     
     options {
