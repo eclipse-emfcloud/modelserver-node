@@ -63,8 +63,8 @@ pipeline {
             }
         }
 
-        stage('Deploy (master only)') {
-            when { branch 'master' }
+        stage('Deploy (main only)') {
+            when { branch 'main' }
             steps {
                 build job: 'deploy-emfcloud-modelserver-node-npm', wait: false
             }
