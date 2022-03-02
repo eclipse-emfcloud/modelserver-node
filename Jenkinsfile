@@ -4,7 +4,7 @@ kind: Pod
 spec:
   containers:
   - name: node
-    image: node:12-alpine
+    image: eclipsetheia/theia-blueprint
     tty: true
     resources:
       limits:
