@@ -42,7 +42,11 @@
     "typescript": "^4.2.3"
   },
   "workspaces": [
-    "examples/*",
-    "packages/*"
+    "examples/custom-command-example",
+    "examples/custom-validator-example",
+    "examples/example-server",
+    "examples/trigger-example",
+    "packages/modelserver-node",
+    "packages/modelserver-plugin-ext"
   ]
 }
