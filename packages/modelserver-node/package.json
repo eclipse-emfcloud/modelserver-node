@@ -25,7 +25,7 @@
     "lib"
   ],
   "dependencies": {
-    "@eclipse-emfcloud/modelserver-plugin-ext": "~0.1.0",
+    "@eclipse-emfcloud/modelserver-plugin-ext": "~0.2.0",
     "axios": "^0.24.0",
     "express": "^4.17.1",
     "express-asyncify": "^1.0.1",
