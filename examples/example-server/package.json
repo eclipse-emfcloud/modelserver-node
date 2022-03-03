@@ -24,7 +24,7 @@
     "lib"
   ],
   "dependencies": {
-    "@eclipse-emfcloud/modelserver-node": "~0.1.0",
+    "@eclipse-emfcloud/modelserver-node": "~0.2.0",
     "inversify": "^5.1.1",
     "yargs": "^17.3.1"
   },
