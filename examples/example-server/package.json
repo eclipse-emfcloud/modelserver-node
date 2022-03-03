@@ -46,8 +46,6 @@
     "lint:fix": "eslint --fix --ext .ts,.tsx ./src",
     "build": "tsc",
     "watch": "tsc -w",
-    "start": "node lib/app.js --port=8082 --upstream=8081",
-    "publish:latest": "yarn publish --tag latest",
-    "publish:next": "yarn publish --new-version \"$(semver $npm_package_version -i minor)-next.$(git rev-parse --short HEAD)\" --tag next"
+    "start": "node lib/app.js --port=8082 --upstream=8081"
   }
 }
