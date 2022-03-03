@@ -1,6 +1,6 @@
 {
   "name": "@eclipse-emfcloud/modelserver-node",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Business Logic layer façade for the Model Server.",
   "license": "(EPL-2.0 OR MIT)",
   "repository": {

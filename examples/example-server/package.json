@@ -1,6 +1,6 @@
 {
   "name": "@eclipse-emfcloud/coffee-server-example",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Example Model Server deployment for the Coffee Model.",
   "license": "(EPL-2.0 OR MIT)",
   "repository": {
