@@ -14,8 +14,8 @@
     "test": "lerna run test",
     "start": "yarn --cwd examples/example-server start",
     "publish": "yarn && yarn publish:latest",
-    "publish:latest": "lerna publish",
-    "publish:next": "lerna publish --exact --canary=next --npm-tag=next --yes"
+    "publish:latest": "lerna publish from-git --no-git-reset --no-verify-access --no-push",
+    "publish:next": "SHA=$(git rev-parse --short HEAD) && lerna publish preminor --exact --canary --preid next.${SHA} --dist-tag next --no-git-reset --no-git-tag-version --no-push --ignore-scripts --yes --no-verify-access"
   },
   "devDependencies": {
     "@sinonjs/referee": "^9.1.1",
