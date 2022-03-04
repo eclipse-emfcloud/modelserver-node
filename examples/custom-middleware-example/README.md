@@ -1,33 +1,17 @@
-# Custom Route Provider Example
+# Middleware Providers Example
 
-This package provides an example of a custom route provider plug-in for the _Model Server_.
-It provides an API endpoint that greets clients.
+This package provides an example of a provider that contributes _Express_ middlewares to the _Model Server_.
 
 ## Details
 
-The plug-in contributes a route provider that establishes custom API Endpoints on `/api/v2/custom/greeter` supporting requests to greet callers and report who has been greeted during the server session.
-Responses follow the typical _Model Server_ JSON protocol.
+The provider contributes two commonly used middlewares to the _Express_ application of the _Model Server_:
 
-```plain
-> GET http://localhost:8082/api/v2/custom/greeter/greet/Fred
-< 200 OK
-  {
-    "type": "success",
-    "data": "Hello, Fred!"
-  }
+- [Helmet][helmet] is added to the root `express.Application` to protect all routes with its default configuration
+- [Morgan][morgan] is added to any `express.Router` that implements custom API routes matching some pattern, which includes the custom Greeter API provided by the [Example Route Provider Plug-in][route-provider]
 
-> GET http://localhost:8082/api/v2/custom/greeter/who
-< 200 OK
-  {
-    "type": "success",
-    "data": [
-      "Alice",
-      "Bob",
-      "Cathy",
-      "Fred"
-    ]
-  }
-```
+[helmet]: https://www.npmjs.com/package/helmet
+[morgan]: https://www.npmjs.com/package/morgan
+[route-provider]: ../custom-route-example/README.md
 
 ## Setup
 

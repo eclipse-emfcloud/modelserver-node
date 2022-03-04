@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import * as express from 'express';
+import { IRouter, RequestHandler } from 'express';
 import { Router } from 'express-ws';
 
 export const RouteProvider = Symbol('RouteProvider');
@@ -44,5 +44,5 @@ export interface MiddlewareProvider {
      *
      * @returns the middlewares to install in the `route`
      */
-    getMiddlewares(router: express.IRouter, route?: string): express.RequestHandler[];
+    getMiddlewares(router: IRouter, route?: string): RequestHandler[];
 }

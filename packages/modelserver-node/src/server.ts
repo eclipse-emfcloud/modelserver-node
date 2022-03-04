@@ -61,6 +61,9 @@ export class ModelServer {
         const { applyTo: wsify, app } = asyncify(expressWS(express(), undefined, { leaveRouterUntouched: true }));
         app.use(express.json());
 
+        // Use provided middlewares that are applicable globally
+        this.middlewareProviders.flatMap(p => p.getMiddlewares(app)).forEach(mw => app.use(mw));
+
         // Isolate contributed route handlers each in their own router.
         const routes = {
             routers: [],
@@ -83,9 +86,6 @@ export class ModelServer {
         routes.install();
 
         const upstream = axios.create({ baseURL: `http://localhost:${upstreamPort}/` });
-
-        // Use middlewares that are applicable globally
-        this.middlewareProviders.flatMap(p => p.getMiddlewares(app)).forEach(mw => app.use(mw));
 
         app.all('*', this.forward(upstream));
         app.ws('*', this.forwardWS(upstream));

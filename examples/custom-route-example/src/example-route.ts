@@ -23,23 +23,47 @@ export class ExampleCustomRouteProvider implements RouteProvider {
     protected readonly logger: Logger;
 
     configureRoutes(routerFactory: RouterFactory): void {
-        const router = routerFactory('/api/v2/custom/greet');
+        const router = routerFactory('/api/v2/custom/greeter');
 
-        this.logger.info('Configuring /api/v2/custom/greet endpoint.');
+        this.logger.info('Configuring /api/v2/custom/greeter endpoint.');
 
-        router.get('/:name', this.greet().bind(this));
+        router.get('/greet/:name', this.greet().bind(this));
+        router.get('/who', this.who().bind(this));
     }
 
     /**
      * Respond to a greeting request.
      *
-     * @returns the greeting handler
+     * @returns the greet handler
      */
     protected greet(): RequestHandler {
-        return async (req: Request, res: Response) => {
-            const name = req.params.name ?? 'Caller';
+        return (req: Request, res: Response) => {
+            const data = greeter.greet(req.params.name);
 
-            res.json({ type: 'success', message: `Hello, ${name}!` });
+            res.json({ type: 'success', data });
+        };
+    }
+
+    /**
+     * Respond to a request for names of all the greeted.
+     *
+     * @returns the who handler
+     */
+    protected who(): RequestHandler {
+        return (req: Request, res: Response) => {
+            const data = Array.from(greeter.greeted);
+
+            res.json({ type: 'success', data });
         };
     }
 }
+
+const greeter = {
+    greeted: new Set<string>(),
+    greet: (name?: string) => {
+        if (name) {
+            greeter.greeted.add(name);
+        }
+        return `Hello, ${name ?? 'caller'}!`;
+    }
+};
