@@ -8,20 +8,19 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Logger, MiddlewareProvider, RouteProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import axios, { AxiosInstance, AxiosRequestConfig, Method } from 'axios';
 import * as express from 'express';
 import { RequestHandler } from 'express';
 import * as asyncify from 'express-asyncify';
 import * as expressWS from 'express-ws';
 import { WebsocketRequestHandler } from 'express-ws';
-import { inject, injectable, multiInject, named, postConstruct } from 'inversify';
+import { inject, injectable, multiInject, named, optional, postConstruct } from 'inversify';
 import * as WebSocket from 'ws';
 
 import { InternalModelServerClientApi } from './client/model-server-client';
 import { handleClose, handleError, WSUpgradeRequest } from './client/web-socket-utils';
 import { InternalModelServerPluginContext } from './plugin-context';
-import { RouteProvider } from './routes/routes';
 
 /**
  * The _Model Server_ core.
@@ -40,6 +39,10 @@ export class ModelServer {
 
     @multiInject(RouteProvider)
     protected routeProviders: RouteProvider[] = [];
+
+    @optional()
+    @multiInject(MiddlewareProvider)
+    protected middlewareProviders: MiddlewareProvider[] = [];
 
     @postConstruct()
     protected initialize(): void {
@@ -64,6 +67,10 @@ export class ModelServer {
             factory: (route: string) => {
                 const newRouter = express.Router();
                 wsify(newRouter);
+
+                // Apply provided route-specific middlewares
+                this.middlewareProviders.flatMap(p => p.getMiddlewares(newRouter, route)).forEach(mw => newRouter.use(mw));
+
                 routes.routers.push({ route, router: newRouter });
                 return newRouter;
             },
@@ -76,6 +83,10 @@ export class ModelServer {
         routes.install();
 
         const upstream = axios.create({ baseURL: `http://localhost:${upstreamPort}/` });
+
+        // Use middlewares that are applicable globally
+        this.middlewareProviders.flatMap(p => p.getMiddlewares(app)).forEach(mw => app.use(mw));
+
         app.all('*', this.forward(upstream));
         app.ws('*', this.forwardWS(upstream));
 

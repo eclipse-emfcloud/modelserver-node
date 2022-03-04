@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 
-import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { WebsocketRequestHandler } from 'express-ws';
 import { inject, injectable, named } from 'inversify';
 import { ParsedQs } from 'qs';
@@ -17,7 +17,6 @@ import * as WebSocket from 'ws';
 
 import { WSUpgradeRequest } from '../client/web-socket-utils';
 import { SubscriptionManager } from '../services/subscription-manager';
-import { RouteProvider, RouterFactory } from './routes';
 
 /**
  * Query parameters for the `GET` request on the `subscribe` endpoint.

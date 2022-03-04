@@ -8,14 +8,14 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { inject, injectable, named } from 'inversify';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { ValidationManager } from '../services/validation-manager';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
-import { handleError, relay, RouteProvider, RouterFactory } from './routes';
+import { handleError, relay } from './routes';
 
 /**
  * Query parameters for the `GET` request on the `validation` endpoint.

@@ -20,7 +20,7 @@ import {
     RemoveCommand,
     SetCommand
 } from '@eclipse-emfcloud/modelserver-client';
-import { Executor, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Executor, Logger, RouteProvider, RouterFactory, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { Operation } from 'fast-json-patch';
 import { ServerResponse } from 'http';
@@ -30,7 +30,7 @@ import { ExecuteMessageBody, InternalModelServerClientApi, TransactionContext } 
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { ValidationManager } from '../services/validation-manager';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
-import { handleError, relay, respondError, RouteProvider, RouterFactory, validateFormat } from './routes';
+import { handleError, relay, respondError, validateFormat } from './routes';
 
 /**
  * Query parameters for the `POST` or `PUT` request on the `models` endpoint.
@@ -50,7 +50,7 @@ interface ModelsPatchQuery {
 }
 
 /**
- * Custom routing of requests on the `/api/v2/{undo,redo}` endpoints.
+ * Custom routing of requests on the `/api/v2/models` endpoint.
  * The primary such customization is an intercept of the `GET` requests for undo/redo
  * to integrate custom validation providers in live validation.
  */
