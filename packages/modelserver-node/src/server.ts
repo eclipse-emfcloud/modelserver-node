@@ -15,6 +15,7 @@ import { RequestHandler } from 'express';
 import * as asyncify from 'express-asyncify';
 import * as expressWS from 'express-ws';
 import { WebsocketRequestHandler } from 'express-ws';
+import * as http from 'http';
 import { inject, injectable, multiInject, named, optional, postConstruct } from 'inversify';
 import * as WebSocket from 'ws';
 
@@ -48,6 +49,8 @@ export class ModelServer {
     protected initialize(): void {
         this.pluginContext.initializePlugins();
     }
+
+    protected server: http.Server;
 
     /**
      * Serve the Model Server application on the given TCP `port`.
@@ -92,13 +95,31 @@ export class ModelServer {
 
         const result = this.modelServerClient.initialize();
         const resultHandler = (): boolean => {
-            app.listen(port, () => this.logger.info(`Model Server (node.js) listening on port ${port}.`));
+            this.server = app.listen(port, () => this.logger.info(`Model Server (node.js) listening on port ${port}.`));
             return true;
         };
         if (result instanceof Promise) {
             return result.then(resultHandler);
         }
         return resultHandler();
+    }
+
+    /**
+     * Stop the server.
+     *
+     * @returns a promise that resolves when the server is stopped
+     */
+    async stop(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.server?.close((err?: Error) => {
+                if (err) {
+                    this.logger.warn('Failed to stop server: %s', err.message);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
     }
 
     /**
