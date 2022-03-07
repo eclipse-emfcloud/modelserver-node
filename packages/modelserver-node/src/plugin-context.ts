@@ -19,7 +19,7 @@ import {
     ValidationProvider,
     ValidationProviderRegistrationOptions
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { inject, injectable, multiInject, named } from 'inversify';
+import { inject, injectable, multiInject, named, optional } from 'inversify';
 
 import { CommandProviderRegistry } from './command-provider-registry';
 import { TriggerProviderRegistry } from './trigger-provider-registry';
@@ -59,8 +59,9 @@ export class BasicModelServerPluginContext implements InternalModelServerPluginC
     @inject(ValidationProviderRegistry)
     protected validationProviderRegistry: ValidationProviderRegistry;
 
+    @optional()
     @multiInject(ModelServerPlugin)
-    protected plugins: ModelServerPlugin[];
+    protected plugins: ModelServerPlugin[] = [];
 
     async initializePlugins(): Promise<unknown> {
         const initializer: (plugin: ModelServerPlugin) => Promise<InitializationResult> = this.initializePlugin.bind(this);
