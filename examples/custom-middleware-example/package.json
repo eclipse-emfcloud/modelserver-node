@@ -1,7 +1,7 @@
 {
-  "name": "@eclipse-emfcloud/modelserver-plugin-ext",
+  "name": "@eclipse-emfcloud/coffee-custom-middleware-example",
   "version": "0.2.0",
-  "description": "Plug-in extension framework for the Model Server.",
+  "description": "Example middleware provider plug-in for the Model Server.",
   "license": "(EPL-2.0 OR MIT)",
   "repository": {
     "type": "git",
@@ -20,20 +20,18 @@
       "url": "https://projects.eclipse.org/projects/ecd.emfcloud"
     }
   ],
-  "main": "lib/index.js",
   "files": [
     "lib"
   ],
   "dependencies": {
-    "@eclipse-emfcloud/modelserver-client": "next",
-    "express-ws": "^5.0.2",
-    "fast-json-patch": "^3.1.0",
+    "@eclipse-emfcloud/modelserver-plugin-ext": "~0.2.0",
+    "helmet": "^5.0.2",
     "inversify": "^5.1.1",
-    "winston": "^3.3.3"
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "@types/morgan": "^1.9.3",
     "@types/reflect-metadata": "^0.1.0",
-    "@types/winston": "^2.4.4",
     "eslint-config-prettier": "^8.3.0",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^2.6.1",

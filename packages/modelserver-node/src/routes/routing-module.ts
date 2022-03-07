@@ -9,10 +9,10 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 
+import { RouteProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { ContainerModule } from 'inversify';
 
 import { ModelsRoutes } from './models';
-import { RouteProvider } from './routes';
 import { SubscriptionRoutes } from './subscription';
 import { UndoRedoRoutes } from './undo-redo';
 import { ValidationRoutes } from './validation';

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../configs/base.tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "moduleResolution": "Node",
+    "rootDir": "src",
+    "outDir": "lib",
+    "baseUrl": ".",
+    "types": ["node", "reflect-metadata"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "**/*.spec.ts"]
+}

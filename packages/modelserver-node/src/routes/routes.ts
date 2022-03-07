@@ -10,26 +10,7 @@
  *******************************************************************************/
 import { AnyObject, Format, ModelUpdateResult } from '@eclipse-emfcloud/modelserver-client';
 import { Response } from 'express';
-import { Router } from 'express-ws';
 import { ServerResponse } from 'http';
-
-export const RouteProvider = Symbol('RouteProvider');
-
-/** Protocol for a factory of Express routers. */
-export type RouterFactory = (route: string) => Router;
-
-/**
- * A provider of custom routing in the _Express_ `app`.
- */
-export interface RouteProvider {
-    /**
-     * Configure routes in an _Express_ plug-in router.
-     *
-     * @param routerFactory creates an the _Express_ router on a given route
-     *    for plug-in route handlers to install themselves into
-     */
-    configureRoutes(routerFactory: RouterFactory): void;
-}
 
 /**
  * Return an error response to the upstream client.

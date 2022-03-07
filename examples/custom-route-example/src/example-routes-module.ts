@@ -9,12 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 
-export * from './command-provider';
-export * from './executor';
-export * from './logger';
-export * from './model-server-client';
-export * from './plugin';
-export * from './route-provider';
-export * from './trigger-provider';
-export * from './util';
-export * from './validation-provider';
+import { RouteProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { ContainerModule } from 'inversify';
+
+import { ExampleCustomRouteProvider } from './example-route';
+
+export default new ContainerModule(bind => {
+    bind(RouteProvider).to(ExampleCustomRouteProvider);
+});
