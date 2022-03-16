@@ -5,6 +5,15 @@ module.exports = {
     ignorePatterns: ['**/{node_modules,lib}'],
     parserOptions: {
         tsconfigRootDir: __dirname,
-        project: 'tsconfig.json'
-    }
+        project: 'tsconfig.eslint.json'
+    },
+    overrides: [
+        {
+            files: ['*.spec.ts'],
+            rules: {
+                'no-unused-expressions': 0,
+                'no-invalid-this': 0
+            }
+        }
+    ]
 };

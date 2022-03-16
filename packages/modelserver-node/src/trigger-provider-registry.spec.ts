@@ -8,13 +8,13 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { Logger, Transaction, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { ModelServerCommand } from '@eclipse-emfcloud/modelserver-client';
-import * as sinon from 'sinon';
-import { expect } from 'chai';
-import { Container } from 'inversify';
-import { Operation } from 'fast-json-patch';
+import { Logger, Transaction, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { assert } from '@sinonjs/referee';
+import { expect } from 'chai';
+import { Operation } from 'fast-json-patch';
+import { Container } from 'inversify';
+import * as sinon from 'sinon';
 
 import { TriggerProviderRegistry } from './trigger-provider-registry';
 
@@ -23,7 +23,9 @@ describe('TriggerProviderRegistry', () => {
 
     beforeEach(() => {
         const logger: Logger = {
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
             debug: () => {},
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
             info: () => {}
         } as any;
 
@@ -105,14 +107,14 @@ function registerProviders(registry: TriggerProviderRegistry, ...providers: Trig
 }
 
 class AsyncCounter {
-    count: number = 0;
+    count = 0;
 
     async tick<T>(action?: T | (() => T)): Promise<T | undefined> {
         return new Promise(resolve => {
             setTimeout(() => {
                 this.count = this.count + 1;
                 if (typeof action === 'function') {
-                    resolve((action as Function)());
+                    resolve((action as () => T)());
                 }
                 return resolve(action as T);
             }, 5);

@@ -9,18 +9,19 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { ModelServerClientApiV2, ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
+import { MiddlewareProvider, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as chai from 'chai';
 import { expect } from 'chai';
-import { createContainer } from './di';
-import { ModelServer } from './server';
 import * as chaiLike from 'chai-like';
-import { MiddlewareProvider, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { IRouter, Request, Response, NextFunction, RequestHandler } from 'express';
+import { IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
+import { Container } from 'inversify';
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
-import { Container } from 'inversify';
 import * as WebSocket from 'ws';
+
+import { createContainer } from './di';
+import { ModelServer } from './server';
 
 /**
  * Integration tests for the server.
@@ -65,8 +66,8 @@ class UpstreamServer {
             .catch(() => {
                 console.log('*** Upstream Java server is not running. Please launch it on port 8081 before running tests.');
                 ifNot();
-                this.testAvailable = (ifNot: () => void) => {
-                    ifNot();
+                this.testAvailable = (_ifNot: () => void) => {
+                    _ifNot();
                     return Promise.reject();
                 };
             });
@@ -93,7 +94,7 @@ class ServerFixture {
     /**
      * Declare that the test suite requires an upstream _Model Server_ to be running, listening on port 8081.
      */
-    requireUpstreamServer() {
+    requireUpstreamServer(): void {
         before(function (done) {
             ServerFixture.upstream.testAvailable(this.skip.bind(this)).finally(done);
         });
@@ -227,8 +228,8 @@ function isCoffeeMachine(obj: unknown): obj is CoffeeMachine {
 function provideMiddleware(container: Container, forRoute?: string): MockMiddleware {
     const result: MockMiddleware = sinon.spy((req, res, next) => next());
     const middlewareProvider: MiddlewareProvider = {
-        getMiddlewares(router: IRouter, route: string) {
-            return route === forRoute ? [result] : [];
+        getMiddlewares(router: IRouter, aRoute: string) {
+            return aRoute === forRoute ? [result] : [];
         }
     };
 
@@ -237,7 +238,11 @@ function provideMiddleware(container: Container, forRoute?: string): MockMiddlew
 }
 
 type SupportedMethod = 'get' | 'put' | 'post' | 'patch' | 'delete';
-type CustomRoute = { method: SupportedMethod; path: string; handler: RequestHandler };
+interface CustomRoute {
+    method: SupportedMethod;
+    path: string;
+    handler: RequestHandler;
+}
 
 function route(method: SupportedMethod, handler: RequestHandler): CustomRoute;
 function route(method: SupportedMethod, path: string, handler: RequestHandler): CustomRoute;
@@ -259,7 +264,7 @@ function provideEndpoint(container: Container, basePath: string, ...routes: Cust
     const provider: RouteProvider = {
         configureRoutes(routerFactory: RouterFactory) {
             const router = routerFactory(basePath);
-            routes.forEach(route => router[route.method](route.path, route.handler));
+            routes.forEach(aRoute => router[aRoute.method](aRoute.path, aRoute.handler));
         }
     };
     container.bind(RouteProvider).toConstantValue(provider);
