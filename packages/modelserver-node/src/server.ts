@@ -186,9 +186,14 @@ export class ModelServer {
             const baseURL = WSUpgradeRequest.toWebsocketURL(upstreamServer.defaults.baseURL).replace(/\/+$/, '');
             const url = `${baseURL}${wsURL}`;
 
+            // Relay text data as text
+            const rawDataHelper = (sock: WebSocket) => (data: WebSocket.RawData, isBinary: boolean) =>
+                isBinary ? sock.send(data) : sock.send(data.toString());
+
             this.logger.debug(`Forwarding websocket to Upstream Model Server.`);
 
             let upstream: WebSocket;
+
             try {
                 upstream = new WebSocket(url);
 
@@ -196,8 +201,8 @@ export class ModelServer {
                 upstream.on('error', handleError('upstream', this.logger, downstream));
                 downstream.on('close', handleClose('downstream', this.logger, upstream));
                 upstream.on('close', handleClose('upstream', this.logger, downstream));
-                downstream.on('message', msg => upstream.send(msg));
-                upstream.on('message', msg => downstream.send(msg));
+                downstream.on('message', rawDataHelper(upstream));
+                upstream.on('message', rawDataHelper(downstream));
             } catch (error) {
                 // The only exception caught here should be in creating the upstream socket
                 handleError('upstream', this.logger, downstream)(error);

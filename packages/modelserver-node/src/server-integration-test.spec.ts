@@ -20,6 +20,7 @@ import { IRouter, Request, Response, NextFunction, RequestHandler } from 'expres
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
 import { Container } from 'inversify';
+import * as WebSocket from 'ws';
 
 /**
  * Integration tests for the server.
@@ -146,6 +147,33 @@ describe('Server Integration Tests', () => {
             const pong = await client.ping();
             expect(pong).to.be.true;
             assert.calledOnce(middleware);
+        });
+    });
+
+    describe('Subscription relays from upstream', () => {
+        const server: ServerFixture = new ServerFixture();
+        server.requireUpstreamServer();
+
+        it('Subscription connect success message', done => {
+            let timeout: NodeJS.Timeout;
+            let ws: WebSocket;
+
+            const futureEvent: Promise<WebSocket.MessageEvent> = new Promise(resolve => {
+                // N.B.: The v1 API uses the relay, not v2
+                ws = new WebSocket('ws://localhost:8082/api/v1/subscribe?modeluri=SuperBrewer3000.coffee&timeout=1000');
+                ws.onmessage = resolve;
+                timeout = setTimeout(() => ws.close(), 1000);
+            });
+
+            futureEvent
+                .then(event => {
+                    clearTimeout(timeout);
+                    ws.close();
+                    expect(event.data).to.be.a.string;
+                    expect(event.data).to.match(/"type"\s*:\s*"success"/);
+                    done();
+                })
+                .catch(done);
         });
     });
 
