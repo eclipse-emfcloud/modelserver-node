@@ -186,10 +186,6 @@ export class ModelServer {
             const baseURL = WSUpgradeRequest.toWebsocketURL(upstreamServer.defaults.baseURL).replace(/\/+$/, '');
             const url = `${baseURL}${wsURL}`;
 
-            // Relay text data as text
-            const rawDataHelper = (sock: WebSocket) => (data: WebSocket.RawData, isBinary: boolean) =>
-                isBinary ? sock.send(data) : sock.send(data.toString());
-
             this.logger.debug(`Forwarding websocket to Upstream Model Server.`);
 
             let upstream: WebSocket;
@@ -210,3 +206,7 @@ export class ModelServer {
         };
     }
 }
+
+// Relay text data as text
+const rawDataHelper = (sock: WebSocket) => (data: WebSocket.RawData, isBinary: boolean) =>
+    isBinary ? sock.send(data) : sock.send(data.toString());
