@@ -15,7 +15,7 @@
       },
       "sourceMaps": true,
       "outFiles": [
-        "${workspaceFolder}/packages/server/lib/**/*.js",
+        "${workspaceFolder}/packages/modelserver-node/lib/**/*.js",
         "${workspaceFolder}/packages/modelserver-plugin-ext/lib/**/*.js",
         "${workspaceFolder}/examples/custom-command-example/lib/**/*.js",
         "${workspaceFolder}/examples/custom-validator-example/lib/**/*.js",
