@@ -66,7 +66,7 @@ For example, this could be the [example custom `increment-duration` command](../
 For example, send a `PATCH` request to
 
 ```plain
-    http://localhost:8082/api/v2/models?modeluri=SuperBrewer3000.coffee
+    http://localhost:8082/api/v2/models?modeluri=SuperBrewer3000.coffee&format=json-v2
 ```
 
 with the following body:
@@ -85,6 +85,11 @@ with the following body:
   }
 }
 ```
+
+You also need to set the following two headers for the request to work:
+
+- Content-Length = \<calculated when request is sent>
+- Content-Type = application/json
 
 Observe in the response that there is a final change to the `duration` that rounds it up to the next multiple of ten.
 A typical response looks something like this:
