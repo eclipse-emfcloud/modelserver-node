@@ -23,10 +23,11 @@ export interface Executor {
     /**
      * Execute a command on the model.
      *
+     * @param modelUri the URI of the model being edited.
      * @param command a command to be executed on the model
      * @return the result of the command's execution
      */
-    execute(command: ModelServerCommand): Promise<ModelUpdateResult>;
+    execute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult>;
 
     /**
      * Apply a JSON patch to the model.

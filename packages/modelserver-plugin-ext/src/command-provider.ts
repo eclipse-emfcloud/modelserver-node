@@ -34,9 +34,10 @@ export interface CommandProvider {
      * Obtain a translation of the given custom command to primitive commands (one or a composite of many)
      * that the _Upstream Model Server_ understands natively.
      *
+     * @param modelUri the URI of the model being edited.
      * @param customCommand the custom command to translate to _Upstream Model Server_ primitives
      * @returns either a command to substitute for the custom command (perhaps a compound command) or a
      *     transaction that should be run in the context of a transactional compound command {@link Executor}
      */
-    getCommands(customCommand: ModelServerCommand): MaybePromise<ModelServerCommand | Transaction>;
+    getCommands(modelUri: string, customCommand: ModelServerCommand): MaybePromise<ModelServerCommand | Transaction>;
 }

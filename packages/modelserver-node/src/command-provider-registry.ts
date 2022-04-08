@@ -81,16 +81,17 @@ export class CommandProviderRegistry {
     /**
      * Obtain the commands to forward to the _Upstream Model Server_ to implement the given custom command.
      *
+     * @param modelUri the URI of the model being edited.
      * @param customCommand get the commands provided for a given custom command
      * @returns the provided command, command transaction, or the original `customCommand` standing in for itself
      *    if no provider can handle the custom command
      */
-    async getCommands(customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
+    async getCommands(modelUri: string, customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
         let result: ModelServerCommand | Operation[] | Transaction | undefined;
         const provider = this.getProvider(customCommand);
         if (provider) {
             this.logger.debug(`Invoking provider for custom ${customCommand.type} command`);
-            result = await provider.getCommands(customCommand);
+            result = await provider.getCommands(modelUri, customCommand);
 
             if (!result) {
                 this.logger.warn(`No commands provided. Custom ${customCommand.type} command will be unhandled.`);
