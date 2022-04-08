@@ -73,11 +73,21 @@ export class SubscriptionRoutes implements RouteProvider {
 }
 
 function parseQuery(query: ParsedQs): SubscriptionQuery {
-    return {
+    const result = {
         modeluri: parseQueryParam(query, 'modeluri'),
         livevalidation: parseQueryParam(query, 'livevalidation', false),
         timeout: parseQueryParam(query, 'timeout', 'number')
     };
+
+    // Pass the rest through
+    for (const key of Object.keys(query)) {
+        const param = parseQueryParam(query, key);
+        if (param && !(key in result)) {
+            result[key] = param;
+        }
+    }
+
+    return result;
 }
 
 function parseQueryParam(query: ParsedQs, name: string, type?: 'string', defaultValue?: string): string | undefined;
