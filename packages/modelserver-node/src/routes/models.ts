@@ -146,7 +146,7 @@ export class ModelsRoutes implements RouteProvider {
     protected async handleCommand(modelURI: string, command: ModelServerCommand, res: Response<any, Record<string, any>>): Promise<void> {
         this.logger.debug(`Getting commands provided for ${command.type}`);
 
-        const provided = await this.commandProviderRegistry.getCommands(command);
+        const provided = await this.commandProviderRegistry.getCommands(modelURI, command);
         this.forwardEdit(modelURI, provided, res);
     }
 
@@ -209,7 +209,7 @@ export class ModelsRoutes implements RouteProvider {
                 // It's a command or JSON Patch. Just execute/apply it in the usual way
                 if (ModelServerCommand.is(providedEdit)) {
                     // Command case
-                    await executor.execute(providedEdit);
+                    await executor.execute(modelURI, providedEdit);
                 } else {
                     // JSON Patch case
                     await executor.applyPatch(providedEdit);

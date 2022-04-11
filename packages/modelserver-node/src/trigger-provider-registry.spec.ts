@@ -87,7 +87,7 @@ describe('TriggerProviderRegistry', () => {
             const transaction = trigger as Transaction;
             const counter = new AsyncCounter();
             const executor = sinon.spy({
-                execute: async (command: ModelServerCommand) => counter.tick({ success: true }),
+                execute: async (modelUri: string, command: ModelServerCommand) => counter.tick({ success: true }),
                 applyPatch: async (patch: Operation | Operation[]) => counter.tick({ success: true })
             });
 

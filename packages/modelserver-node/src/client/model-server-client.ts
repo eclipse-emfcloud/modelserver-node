@@ -431,7 +431,7 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     // Doc inherited from `Executor` interface
-    async execute(command: ModelServerCommand): Promise<ModelUpdateResult> {
+    async execute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
         if (!this.socket) {
             return Promise.reject('Socket is closed.');
         }
@@ -443,7 +443,7 @@ class DefaultTransactionContext implements TransactionContext {
         } else {
             this.logger.debug(`Getting commands provided recursively for ${command.type}`);
 
-            const provided = await this.commandProviderRegistry.getCommands(command);
+            const provided = await this.commandProviderRegistry.getCommands(modelUri, command);
             if (typeof provided === 'function') {
                 // It's a transaction function. We already have a transaction context (this one)
                 this.pushNestedContext();

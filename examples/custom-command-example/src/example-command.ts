@@ -52,7 +52,7 @@ class IncrementDurationCommandProvider implements CommandProvider {
         return true; // The command type filter is all I need
     }
 
-    getCommands(customCommand: ModelServerCommand): Transaction {
+    getCommands(_modelUri: string, customCommand: ModelServerCommand): Transaction {
         const [modelURI, elementID] = customCommand.owner.$ref.split('#');
 
         return async executor => {
