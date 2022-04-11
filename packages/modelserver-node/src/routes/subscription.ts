@@ -72,22 +72,35 @@ export class SubscriptionRoutes implements RouteProvider {
     }
 }
 
+/**
+ * Parse the subscription request query parameters coming from the downstream client to
+ * extract details for local use and filter what is passed along to the upstream
+ * subscription. This includes
+ *
+ * - enforcing required parameters, e.g. `modeluri`
+ * - applying type coercion and defaults to known parameters, e.g. `livevalidation`
+ * - filtering out query parameters that cannot be parsed from simple strings
+ *
+ * @param query the subscription request query parameters from downstream that we forward to the upstream server
+ * @returns the parsed and filtered subscription query parameters
+ */
 function parseQuery(query: ParsedQs): SubscriptionQuery {
-    const result = {
-        modeluri: parseQueryParam(query, 'modeluri'),
-        livevalidation: parseQueryParam(query, 'livevalidation', false),
-        timeout: parseQueryParam(query, 'timeout', 'number')
-    };
-
-    // Pass the rest through
-    for (const key of Object.keys(query)) {
-        const param = parseQueryParam(query, key);
-        if (param && !(key in result)) {
-            result[key] = param;
+    return Object.keys(query).reduce(
+        (acc, item) => {
+            const param = parseQueryParam(query, item);
+            if (param && !acc[item]) {
+                acc[item] = param;
+            }
+            return acc;
+        },
+        {
+            // Special-case these because the modeluri is required and the
+            // other two are known parameters and have typed default values
+            modeluri: parseQueryParam(query, 'modeluri'),
+            livevalidation: parseQueryParam(query, 'livevalidation', false),
+            timeout: parseQueryParam(query, 'timeout', 'number')
         }
-    }
-
-    return result;
+    );
 }
 
 function parseQueryParam(query: ParsedQs, name: string, type?: 'string', defaultValue?: string): string | undefined;
