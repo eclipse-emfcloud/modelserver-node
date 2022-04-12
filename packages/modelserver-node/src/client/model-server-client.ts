@@ -479,7 +479,7 @@ class DefaultTransactionContext implements TransactionContext {
         const result = WebSocketMessageAcceptor.promise<ModelUpdateResult>(this.socket, message => {
             const matched = message.type === 'success' && Operations.isPatch(message.data.patch);
             if (matched && current) {
-                this.mergeModelUpdateResult(current, message.data);
+                this.mergeModelUpdateResult(current, MessageDataMapper.patchModel(message));
             }
             return matched;
         });
@@ -535,7 +535,12 @@ class DefaultTransactionContext implements TransactionContext {
      */
     private mergeModelUpdateResult(dst: ModelUpdateResult, src?: ModelUpdateResult): void {
         if (src?.patch && src.patch.length) {
+            dst.success = dst.success && src.success;
             dst.patch = (dst.patch ?? []).concat(src.patch);
+
+            if (dst.success && src.patchModel) {
+                dst.patchModel = src.patchModel;
+            }
         }
     }
 
