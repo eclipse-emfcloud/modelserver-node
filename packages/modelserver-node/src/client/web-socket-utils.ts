@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { AnyObject, encode, ModelServerMessage, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
+import { AnyObject, encode, IdentityMapper, MessageDataMapper, ModelServerMessage, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
 import { Request } from 'express';
 import { Logger } from 'winston';
 import * as WebSocket from 'ws';
@@ -137,9 +137,34 @@ export class WebSocketMessageAcceptor<T = AnyObject> {
      * @param predicate a test whether a message payload is of the expected type
      * @returns a promise of the expected message type
      */
-    static promise<U>(socket: WebSocket, predicate: (object: ModelServerMessage<U>) => boolean): Promise<U> {
+    static promise<D>(socket: WebSocket, predicate: (object: ModelServerMessage<D>) => boolean): Promise<D>;
+
+    /**
+     * Convenience for creating a promise that will be resolved when a message of the expected
+     * type is received, with transformation of the message by a mapper function.
+     * If the socket is closed before that, then the promise is rejected.
+     *
+     * @param socket the socket on which to wait for incoming messages
+     * @param predicate a test whether a message payload is of the expected type
+     * @param mapper a message data mapper to generate the promised result
+     * @returns a promise of the expected mapped message type
+     */
+    static promise<D = unknown, U = unknown>(
+        socket: WebSocket,
+        predicate: (object: ModelServerMessage<D>) => boolean,
+        mapper: MessageDataMapper<U>
+    ): Promise<U>;
+
+    static promise<D = unknown, U = D>(
+        socket: WebSocket,
+        predicate: (object: ModelServerMessage<D>) => boolean,
+        mapper?: MessageDataMapper<U>
+    ): Promise<U> {
+        if (!mapper) {
+            mapper = IdentityMapper;
+        }
         return new Promise<U>((resolve, reject) => {
-            const parser: (message: ModelServerMessage<U>) => U = message => (predicate(message) ? message.data : undefined);
+            const parser: (message: ModelServerMessage<D>) => U = message => (predicate(message) ? mapper!(message) : undefined);
 
             WebSocketMessageAcceptor.accept(socket, parser, resolve, () => reject('Socket closed'));
         });

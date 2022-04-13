@@ -20,7 +20,6 @@ import {
     ModelServerMessage,
     ModelServerNotification,
     ModelUpdateResult,
-    Operations,
     ServerConfiguration,
     SubscriptionListener,
     SubscriptionOptions,
@@ -476,12 +475,16 @@ class DefaultTransactionContext implements TransactionContext {
         }
 
         const { aggregatedUpdateResult: current } = this.peekNestedContext();
-        const result = WebSocketMessageAcceptor.promise<ModelUpdateResult>(this.socket, message => {
-            const matched = message.type === 'success' && Operations.isPatch(message.data.patch);
-            if (matched && current) {
-                this.mergeModelUpdateResult(current, MessageDataMapper.patchModel(message));
+        const result = WebSocketMessageAcceptor.promise<any, ModelUpdateResult>(
+            this.socket,
+            message => true, // Need to accept and merge failed updates as well as successful
+            MessageDataMapper.patchModel
+        ).then(modelUpdateResult => {
+            // If we are currently tracking a merged update result, incorporate this new result
+            if (current) {
+                this.mergeModelUpdateResult(current, modelUpdateResult);
             }
-            return matched;
+            return modelUpdateResult;
         });
 
         this.socket.send(JSON.stringify(this.message('execute', body)));
