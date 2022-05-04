@@ -15,11 +15,13 @@ import * as chai from 'chai';
 import { expect } from 'chai';
 import * as chaiLike from 'chai-like';
 import { IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
+import { Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
 import * as WebSocket from 'ws';
 
+import { InternalModelServerClientApi } from './client/model-server-client';
 import { createContainer } from './di';
 import { ModelServer } from './server';
 
@@ -209,6 +211,48 @@ describe('Server Integration Tests', () => {
                     done();
                 })
                 .catch(done);
+        });
+    });
+
+    describe('TransactionContext', async () => {
+        const server: ServerFixture = new ServerFixture();
+        server.requireUpstreamServer();
+
+        let client: InternalModelServerClientApi;
+
+        before(async () => {
+            // Create an internal client with transaction capability
+            client = await createContainer(8081, 'error').then(container => {
+                const result: InternalModelServerClientApi = container.get(InternalModelServerClientApi);
+                result.initialize();
+                return result;
+            });
+        });
+
+        it('Aggregation of model update results', async () => {
+            const transaction = await client.openTransaction('SuperBrewer3000.coffee');
+
+            const patch1: Operation = { op: 'replace', path: '/workflows/0/name', value: 'New Name' };
+            const patch2: Operation = { op: 'replace', path: '/workflows/0/name', value: 'Next New Name' };
+
+            try {
+                expect(transaction).to.have.property('getUUID');
+
+                const uuid = await (transaction as any).getUUID();
+                expect(uuid).to.be.a('string');
+
+                const update1 = await transaction.applyPatch(patch1);
+                expect(update1).to.be.like({ success: true, patch: [patch1] });
+
+                const update2 = await transaction.applyPatch(patch2);
+                expect(update2).to.be.like({ success: true, patch: [patch2] });
+            } finally {
+                const aggregated = await transaction.close();
+                expect(aggregated).to.be.like({
+                    success: true,
+                    patch: [patch1, patch2]
+                });
+            }
         });
     });
 });
