@@ -34,6 +34,7 @@ import * as WebSocket from 'ws';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
+import { defer, Deferred } from './promise-utils';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -359,6 +360,8 @@ class DefaultTransactionContext implements TransactionContext {
 
     private nestedContexts: NestedEditContext[] = [];
 
+    private readonly uuid: Deferred<string>;
+
     constructor(
         protected readonly transactionURI: string,
         protected readonly modelURI: string,
@@ -371,6 +374,8 @@ class DefaultTransactionContext implements TransactionContext {
         this.execute = this.execute.bind(this);
         this.close = this.close.bind(this);
         this.rollback = this.rollback.bind(this);
+
+        this.uuid = defer();
     }
 
     /**
@@ -380,7 +385,7 @@ class DefaultTransactionContext implements TransactionContext {
      * @returns a new transaction context
      */
     open(closeCallback: (tc: TransactionContext) => void): Promise<TransactionContext> {
-        const result: Promise<TransactionContext> = new Promise((resolve, reject) => {
+        const result: Promise<TransactionContext> = new Promise((resolveTransaction, reject) => {
             this.closeCallback = closeCallback;
 
             const wsURI = new URL(this.transactionURI);
@@ -393,7 +398,16 @@ class DefaultTransactionContext implements TransactionContext {
             };
             socket.onopen = event => {
                 this.socket = socket;
-                resolve(this);
+                WebSocketMessageAcceptor.promise<string, string>(
+                    this.socket,
+                    msg => typeof msg.data === 'string',
+                    MessageDataMapper.asString
+                )
+                    .then(uuid_ => {
+                        this.uuid.resolve(uuid_);
+                        resolveTransaction(this);
+                    })
+                    .catch(this.uuid.reject);
             };
             socket.onmessage = event => {
                 this.logger.debug(`Message: ${event.data}`);
@@ -407,6 +421,15 @@ class DefaultTransactionContext implements TransactionContext {
         });
 
         return result;
+    }
+
+    /**
+     * Obtain the UUID of this transaction, when it has been received from the upstream server.
+     *
+     * @returns the UUID, when it is available
+     */
+    getUUID(): Promise<string> {
+        return this.uuid.promise();
     }
 
     // Doc inherited from `Executor` interface
@@ -469,10 +492,13 @@ class DefaultTransactionContext implements TransactionContext {
         });
     }
 
-    private sendExecuteMessage(body: ExecuteMessageBody): Promise<ModelUpdateResult> {
+    private async sendExecuteMessage(body: ExecuteMessageBody): Promise<ModelUpdateResult> {
         if (!this.socket) {
             return Promise.reject('Socket is closed.');
         }
+
+        // Make sure that we have first processed the transaction opening exchange
+        await this.getUUID();
 
         const { aggregatedUpdateResult: current } = this.peekNestedContext();
         const result = WebSocketMessageAcceptor.promise<any, ModelUpdateResult>(
