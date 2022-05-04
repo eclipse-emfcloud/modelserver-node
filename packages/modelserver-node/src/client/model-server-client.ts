@@ -34,7 +34,7 @@ import * as WebSocket from 'ws';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
-import { defer, Deferred } from './promise-utils';
+import { CompletablePromise } from './promise-utils';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -360,7 +360,7 @@ class DefaultTransactionContext implements TransactionContext {
 
     private nestedContexts: NestedEditContext[] = [];
 
-    private readonly uuid: Deferred<string>;
+    private readonly uuid: CompletablePromise<string>;
 
     constructor(
         protected readonly transactionURI: string,
@@ -375,7 +375,7 @@ class DefaultTransactionContext implements TransactionContext {
         this.close = this.close.bind(this);
         this.rollback = this.rollback.bind(this);
 
-        this.uuid = defer();
+        this.uuid = CompletablePromise.newPromise();
     }
 
     /**
@@ -428,8 +428,8 @@ class DefaultTransactionContext implements TransactionContext {
      *
      * @returns the UUID, when it is available
      */
-    getUUID(): Promise<string> {
-        return this.uuid.promise();
+    getUUID(): PromiseLike<string> {
+        return this.uuid;
     }
 
     // Doc inherited from `Executor` interface

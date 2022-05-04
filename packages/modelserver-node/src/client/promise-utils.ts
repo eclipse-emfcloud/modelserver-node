@@ -12,38 +12,48 @@
 /**
  * A simple protocol for a deferred value: an externally settlable promise.
  */
-export interface Deferred<T> {
-    /** Obtain the deferred value. */
-    promise(): Promise<T>;
-    /** Resolve the deferred value. */
+export interface CompletablePromise<T> extends PromiseLike<T> {
+    /** Complete the promise by resolving its value. */
     resolve(value: T | PromiseLike<T>): void;
-    /** Reject the deferred value. */
+    /** Settle the promise by rejecting its value. */
     reject(reason?: any): void;
+
+    /** Handle the rejection case only, as with a `Promise`. */
+    catch<U = never>(onrejected?: ((reason: any) => U | PromiseLike<U>) | undefined | null): Promise<T | U>;
 }
 
-/**
- * Create a new deferred value.
- *
- * @returns a new deferred value
- */
-export function defer<T>(): Deferred<T> {
-    return new DeferredImpl<T>();
-}
-
-class DeferredImpl<T> implements Deferred<T> {
-    resolve: (value: T | PromiseLike<T>) => void;
-    reject: (reason?: any) => void;
-
-    private readonly promise_: Promise<T>;
-
-    constructor() {
-        this.promise_ = new Promise((resolve, reject) => {
-            this.resolve = resolve;
-            this.reject = reject;
-        });
+export namespace CompletablePromise {
+    /**
+     * Create a new completable promise.
+     *
+     * @returns a new completable promise
+     */
+    export function newPromise<T>(): CompletablePromise<T> {
+        return new Impl<T>();
     }
 
-    promise(): Promise<T> {
-        return this.promise_;
+    class Impl<T> implements CompletablePromise<T> {
+        resolve: (value: T | PromiseLike<T>) => void;
+        reject: (reason?: any) => void;
+
+        private readonly promise: Promise<T>;
+
+        constructor() {
+            this.promise = new Promise((resolve, reject) => {
+                this.resolve = resolve;
+                this.reject = reject;
+            });
+        }
+
+        then<U = T, V = never>(
+            onfulfilled?: (value: T) => U | PromiseLike<U>,
+            onrejected?: (reason: any) => V | PromiseLike<V>
+        ): PromiseLike<U | V> {
+            return this.promise.then(onfulfilled, onrejected);
+        }
+
+        catch<U = never>(onrejected?: (reason: any) => U | PromiseLike<U>): Promise<T | U> {
+            return this.promise.catch(onrejected);
+        }
     }
 }
