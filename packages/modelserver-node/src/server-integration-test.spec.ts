@@ -158,25 +158,49 @@ describe('Server Integration Tests', () => {
         server.requireUpstreamServer();
 
         it('Subscription connect success message', done => {
-            let timeout: NodeJS.Timeout;
-            let ws: WebSocket;
-
-            const futureEvent: Promise<WebSocket.MessageEvent> = new Promise(resolve => {
+            const futureEvent = captureMessage(
                 // N.B.: The v1 API uses the relay, not v2
-                ws = new WebSocket('ws://localhost:8082/api/v1/subscribe?modeluri=SuperBrewer3000.coffee&timeout=1000');
-                ws.onmessage = resolve;
-                timeout = setTimeout(() => ws.close(), 1000);
-            });
+                new WebSocket('ws://localhost:8082/api/v1/subscribe?modeluri=SuperBrewer3000.coffee&timeout=1000')
+            );
 
             futureEvent
                 .then(event => {
-                    clearTimeout(timeout);
-                    ws.close();
                     expect(event.data).to.be.a.string;
                     expect(event.data).to.match(/"type"\s*:\s*"success"/);
                     done();
                 })
                 .catch(done);
+        });
+    });
+
+    describe('Subscription with validation', () => {
+        const server: ServerFixture = new ServerFixture();
+        server.requireUpstreamServer();
+
+        it('Initial validation results on connection', done => {
+            const futureEvent = captureMessage(
+                new WebSocket('ws://localhost:8082/api/v2/subscribe?modeluri=SuperBrewer3000.coffee&timeout=1000&livevalidation=true'),
+                msg => msg.data.toString().includes('validationResult')
+            );
+
+            futureEvent
+                .then(event => {
+                    expect(event.data).to.be.a.string;
+                    expect(event.data).to.match(/"type"\s*:\s*"validationResult"/);
+                    done();
+                })
+                .catch(done);
+        });
+
+        it('Non-validation subscription gets no initial validation state', done => {
+            const futureEvent = captureMessage(
+                new WebSocket('ws://localhost:8082/api/v2/subscribe?modeluri=SuperBrewer3000.coffee&timeout=1000'),
+                msg => msg.data.toString().includes('validationResult')
+            );
+
+            futureEvent
+                .then(() => done(new Error('Should not have got a validation result message.')))
+                .catch(() => done() /* This is the success path. */);
         });
     });
 
@@ -312,4 +336,38 @@ function provideEndpoint(container: Container, basePath: string, ...routes: Cust
         }
     };
     container.bind(RouteProvider).toConstantValue(provider);
+}
+
+interface SocketTimeout {
+    clear(): void;
+}
+
+function socketTimeout(ws: WebSocket, reject: (reason?: any) => void): SocketTimeout {
+    const result = setTimeout(() => {
+        ws.close();
+        reject(new Error('timeout'));
+    }, 1000);
+
+    return {
+        clear: () => {
+            ws.close();
+            clearTimeout(result);
+        }
+    };
+}
+
+function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) => boolean): Promise<WebSocket.MessageEvent> {
+    let timeout: SocketTimeout;
+
+    return new Promise<WebSocket.MessageEvent>((resolve, reject) => {
+        ws.onmessage = msg => {
+            if (!filter || filter(msg)) {
+                resolve(msg);
+            }
+        };
+        timeout = socketTimeout(ws, reject);
+    }).then(result => {
+        timeout.clear();
+        return result;
+    });
 }
