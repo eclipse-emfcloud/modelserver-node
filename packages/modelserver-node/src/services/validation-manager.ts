@@ -10,9 +10,10 @@
  *******************************************************************************/
 import { Diagnostic, encode, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
 import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { inject, injectable, named } from 'inversify';
+import { inject, injectable, named, postConstruct } from 'inversify';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
+import { JSONSocket } from '../client/web-socket-utils';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
 import { SubscriptionManager } from './subscription-manager';
 
@@ -35,6 +36,15 @@ export class ValidationManager {
 
     @inject(SubscriptionManager)
     protected readonly subscriptionManager: SubscriptionManager;
+
+    @postConstruct()
+    initialize(): void {
+        this.subscriptionManager.addSubscribedListener((client, params) => {
+            if (params.livevalidation) {
+                this.initializeLiveValidation(client, params.modeluri);
+            }
+        });
+    }
 
     async validate(modelURI: string): Promise<Diagnostic> {
         const model = await this.modelServerClient.get(modelURI).then(asModelServerObject);
@@ -73,6 +83,10 @@ export class ValidationManager {
                 this.logger.error('Live validation failed.', reason);
                 return false;
             });
+    }
+
+    protected async initializeLiveValidation(client: JSONSocket, modelURI: string): Promise<unknown> {
+        return this.validate(modelURI).then(diagnostics => this.subscriptionManager.sendValidation(client, diagnostics));
     }
 }
 
