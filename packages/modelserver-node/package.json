@@ -22,7 +22,8 @@
   ],
   "main": "lib/index.js",
   "files": [
-    "lib"
+    "lib",
+    "src"
   ],
   "dependencies": {
     "@eclipse-emfcloud/modelserver-plugin-ext": "~0.2.0",
@@ -53,7 +54,7 @@
     "clean": "rimraf lib",
     "lint": "eslint --ext .ts,.tsx ./src",
     "lint:fix": "eslint --fix --ext .ts,.tsx ./src",
-    "build": "tsc",
+    "build": "tsc && yarn lint",
     "start": "node lib/app.js --port=8082 --upstream=8081",
     "test": "mocha --config ../../configs/.mocharc.json \"./src/**/*.spec.?(ts|tsx)\"",
     "watch": "tsc -w"
