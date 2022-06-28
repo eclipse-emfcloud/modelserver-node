@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { ModelServerClientApiV2, ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
+import { ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
 import { MiddlewareProvider, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as chai from 'chai';
@@ -21,7 +21,7 @@ import * as sinon from 'sinon';
 import { assert } from 'sinon';
 import * as WebSocket from 'ws';
 
-import { InternalModelServerClientApi } from './client/model-server-client';
+import { InternalModelServerClientApi, TransactionContext } from './client/model-server-client';
 import { createContainer } from './di';
 import { ModelServer } from './server';
 
@@ -81,7 +81,7 @@ class ServerFixture {
     static upstream = new UpstreamServer();
 
     readonly baseUrl: string;
-    readonly client: ModelServerClientApiV2;
+    readonly client: ModelServerClientV2;
     protected server: ModelServer;
 
     constructor(protected readonly containerConfig?: (container: Container) => void) {
@@ -243,6 +243,7 @@ describe('Server Integration Tests', () => {
         server.requireUpstreamServer();
 
         let client: InternalModelServerClientApi;
+        let transaction: TransactionContext;
 
         before(async () => {
             // Create an internal client with transaction capability
@@ -253,9 +254,15 @@ describe('Server Integration Tests', () => {
             });
         });
 
-        it('Aggregation of model update results', async () => {
-            const transaction = await client.openTransaction('SuperBrewer3000.coffee');
+        beforeEach(async () => {
+            transaction = await client.openTransaction('SuperBrewer3000.coffee');
+        });
 
+        afterEach(async () => {
+            transaction.rollback('Test completed, rollback.');
+        });
+
+        it('Aggregation of model update results', async () => {
             const patch1: Operation = { op: 'replace', path: '/workflows/0/name', value: 'New Name' };
             const patch2: Operation = { op: 'replace', path: '/workflows/0/name', value: 'Next New Name' };
 
@@ -277,6 +284,33 @@ describe('Server Integration Tests', () => {
                     patch: [patch1, patch2]
                 });
             }
+        });
+
+        it('Check format of model update results (json-v2)', async () => {
+            const addPatch: Operation = {
+                op: 'add',
+                path: '/workflows/0/nodes',
+                value: {
+                    $type: 'http://www.eclipsesource.com/modelserver/example/coffeemodel#//ManualTask',
+                    name: 'New ManualTask'
+                }
+            };
+
+            const updateResult = await transaction.applyPatch(addPatch);
+            expect(updateResult).to.be.like({
+                success: true,
+                patch: [
+                    {
+                        op: 'add',
+                        path: '/workflows/0/nodes/-',
+                        value: {
+                            $type: 'http://www.eclipsesource.com/modelserver/example/coffeemodel#//ManualTask',
+                            $id: '//@workflows.0/@nodes.1',
+                            name: 'New ManualTask'
+                        }
+                    }
+                ]
+            });
         });
     });
 });

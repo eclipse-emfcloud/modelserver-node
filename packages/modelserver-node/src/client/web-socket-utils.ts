@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { AnyObject, encode, IdentityMapper, MessageDataMapper, ModelServerMessage, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
+import { AnyObject, IdentityMapper, MessageDataMapper, ModelServerMessage, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
 import { Request } from 'express';
 import { Logger } from 'winston';
 import * as WebSocket from 'ws';
@@ -171,11 +171,10 @@ export class WebSocketMessageAcceptor<T = AnyObject> {
     }
 }
 
-function toModelServerMessage<T>(o: any): ModelServerMessage<T> | undefined {
-    if (ModelServerMessage.is(o)) {
-        // Convert $type to eClass for now
-        // TODO: API with correct $type property
-        return encode('json')(o) as ModelServerMessage<T>;
+function toModelServerMessage<T>(message: any): ModelServerMessage<T> | undefined {
+    if (ModelServerMessage.is(message)) {
+        // The received patch message is in format 'json-v2', therefore no additional encoding needed here
+        return message as ModelServerMessage<T>;
     }
 
     return undefined;

@@ -65,6 +65,13 @@ export class CommandProviderRegistry {
         }
     }
 
+    /**
+     * Query whether any command providers are registered.
+     */
+    hasProviders(): boolean {
+        return this.providers.size > 0;
+    }
+
     hasProvider(commandType: string): boolean {
         return this.providers.has(commandType);
     }
