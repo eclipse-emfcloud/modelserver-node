@@ -56,7 +56,8 @@
     "lint:fix": "eslint --fix --ext .ts,.tsx ./src",
     "build": "tsc && yarn lint",
     "start": "node lib/app.js --port=8082 --upstream=8081",
-    "test": "mocha --config ../../configs/.mocharc.json \"./src/**/*.spec.?(ts|tsx)\"",
+    "test": "mocha --config ../../configs/.mocharc.json",
+    "test:ci": "mocha --config ../../configs/.mocharc.ci.json",
     "watch": "tsc -w"
   }
 }
