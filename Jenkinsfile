@@ -58,7 +58,30 @@ pipeline {
         stage('Build') {
             steps {
                 container('node') {
-                    buildInstaller()
+                    timeout(30) {
+                        sh "rm -rf ${YARN_CACHE_FOLDER}"
+                        sh "yarn --ignore-engines --unsafe-perm"
+                    }
+                }
+            }
+        }
+
+        stage('Codechecks ESLint') {
+            steps {
+                container('node') {
+                    timeout(30) {
+                        sh "yarn lint -o eslint.xml -f checkstyle"
+                    }
+                }
+            }
+        }
+
+        stage('Run tests') {
+            steps {
+                container('node') {
+                    timeout(30) {
+                        sh "yarn test:ci"
+                    }
                 }
             }
         }
@@ -70,20 +93,17 @@ pipeline {
             }
         }
     }
-}
 
-def buildInstaller() {
-    int MAX_RETRY = 3
+    post {
+        always {
+            // Record & publish ESLint issues
+            recordIssues enabledForFailure: true, publishAllIssues: true, aggregatingResults: true, 
+            tools: [esLint(pattern: 'node_modules/**/*/eslint.xml')], 
+            qualityGates: [[threshold: 1, type: 'TOTAL', unstable: true]]
 
-    checkout scm
-    sh "printenv && yarn cache dir"
-    sh "yarn cache clean"
-    try {
-        sh(script: 'yarn --frozen-lockfile --force')
-    } catch(error) {
-        retry(MAX_RETRY) {
-            echo "yarn failed - Retrying"
-            sh(script: 'yarn --frozen-lockfile --force')        
+            withChecks('Tests') {
+                junit 'node_modules/**/mocha-jenkins-report.xml'
+            }
         }
     }
 }

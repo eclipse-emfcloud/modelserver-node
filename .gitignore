@@ -12,3 +12,6 @@ lib
 
 example/*-app/*
 !example/*-app/package.json
+
+**/mocha-jenkins-report.xml
+**/eslint.xml
