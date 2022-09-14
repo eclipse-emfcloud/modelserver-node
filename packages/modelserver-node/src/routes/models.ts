@@ -14,8 +14,6 @@ import {
     CompoundCommand,
     encode,
     ModelServerCommand,
-    ModelServerCommandPackage,
-    ModelServerObject,
     ModelUpdateResult,
     RemoveCommand,
     SetCommand
@@ -26,7 +24,7 @@ import { Operation } from 'fast-json-patch';
 import { ServerResponse } from 'http';
 import { inject, injectable, named } from 'inversify';
 
-import { ExecuteMessageBody, InternalModelServerClientApi, TransactionContext } from '../client/model-server-client';
+import { ExecuteMessageBody, InternalModelServerClientApi, isModelServerCommand, TransactionContext } from '../client/model-server-client';
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { ValidationManager } from '../services/validation-manager';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
@@ -181,7 +179,7 @@ export class ModelsRoutes implements RouteProvider {
             // It's a substitute command or JSON Patch. Just execute/apply it in the usual way
             let result: Promise<ModelUpdateResult>;
 
-            if (ModelServerCommand.is(providedEdit)) {
+            if (isModelServerCommand(providedEdit)) {
                 // Command case
                 result = this.modelServerClient.edit(modelURI, providedEdit);
             } else {
@@ -207,7 +205,7 @@ export class ModelsRoutes implements RouteProvider {
                 result = await providedEdit(executor);
             } else {
                 // It's a command or JSON Patch. Just execute/apply it in the usual way
-                if (ModelServerCommand.is(providedEdit)) {
+                if (isModelServerCommand(providedEdit)) {
                     // Command case
                     await executor.execute(modelURI, providedEdit);
                 } else {
@@ -314,10 +312,6 @@ function asModelServerCommand(command: any): ModelServerCommand | undefined {
     }
 
     return undefined;
-}
-
-function isModelServerCommand(object: any): object is ModelServerCommand {
-    return ModelServerObject.is(object) && object.eClass.startsWith(ModelServerCommandPackage.NS_URI + '#//');
 }
 
 function isCustomCommand(command: ModelServerCommand): boolean {

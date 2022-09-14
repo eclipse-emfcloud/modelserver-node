@@ -17,8 +17,10 @@ import {
     Model,
     ModelServerClientV2,
     ModelServerCommand,
+    ModelServerCommandPackage,
     ModelServerMessage,
     ModelServerNotification,
+    ModelServerObject,
     ModelUpdateResult,
     ServerConfiguration,
     SubscriptionListener,
@@ -477,7 +479,7 @@ class DefaultTransactionContext implements TransactionContext {
                 return this.popNestedContext();
             } else {
                 // It's a substitute command or patch. Just pass it on in the usual way
-                if (ModelServerCommand.is(provided)) {
+                if (isModelServerCommand(provided)) {
                     return this.sendCommand(provided);
                 }
                 return this.sendPatch(provided);
@@ -654,3 +656,13 @@ class DefaultTransactionContext implements TransactionContext {
 
 // A model update result indicating that the transaction was already closed or was rolled back
 const transactionClosed: ModelUpdateResult = { success: false };
+
+/**
+ * Query whether an `object` is any kind of `ModelServerCommand`.
+ *
+ * @param object an object
+ * @returns whether it is a `ModelServerCommand` of some kind
+ */
+export function isModelServerCommand(object: any): object is ModelServerCommand {
+    return ModelServerObject.is(object) && object.eClass.startsWith(ModelServerCommandPackage.NS_URI + '#//');
+}
