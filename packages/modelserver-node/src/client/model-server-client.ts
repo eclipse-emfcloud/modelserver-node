@@ -27,7 +27,7 @@ import {
     SubscriptionOptions,
     TypeGuard
 } from '@eclipse-emfcloud/modelserver-client';
-import { Executor, Logger, ModelServerClientApi, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { EditTransaction, Executor, Logger, ModelServerClientApi, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import axios from 'axios';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
@@ -75,27 +75,13 @@ export interface InternalModelServerClientApi extends ModelServerClientApi {
 /**
  * Protocol for the client-side context of an open transaction on a model URI.
  */
-export interface TransactionContext extends Executor {
+export interface TransactionContext extends Executor, EditTransaction {
     /**
-     * Query whether the transaction is currently open.
+     * Open a nested (child) transaction.
+     * It commits its changes into the parent transaction that opened it.
+     * It rolls back all changes up the transaction stack, closing the root transaction.
      */
-    isOpen(): boolean;
-
-    /**
-     * Close the transaction, putting the compound of all commands executed within its span
-     * onto the stack for undo/redo.
-     *
-     * @returns the aggregate result of changes performed during the transaction
-     */
-    close(): Promise<ModelUpdateResult>;
-
-    /**
-     * Undo all changes performed during the transaction and discard them.
-     *
-     * @param error the reason for the rollback
-     * @returns a failed update result
-     */
-    rollback(error: any): Promise<ModelUpdateResult>;
+    openTransaction(): Promise<TransactionContext>;
 }
 
 /**
@@ -177,14 +163,15 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     protected _baseURL: string;
 
     initialize(): void | Promise<void> {
-        const basePath = this.upstreamConnectionConfig.baseURL.replace(/^\/+/, '');
+        const basePath = this.upstreamConnectionConfig.baseURL.replace(/^\/+/, '').replace(/\/+$/, '');
         this._baseURL = `http://${this.upstreamConnectionConfig.hostname}:${this.upstreamConnectionConfig.serverPort}/${basePath}`;
         return this.delegate.initialize(this._baseURL, DEFAULT_FORMAT);
     }
 
     async openTransaction(modelURI: string): Promise<TransactionContext> {
         if (this.transactions.has(modelURI)) {
-            return Promise.reject(Error(`Transaction already open on model ${modelURI}`));
+            // Open a nested transaction
+            return this.transactions.get(modelURI).openTransaction();
         }
 
         const clientID = uuid();
@@ -216,9 +203,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
             const encodedParams = Object.entries(queryParameters)
                 .map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value.toString()))
                 .join('&');
-            return `${this._baseURL}${pathToAppend}?${encodedParams}`;
+            return `${this._baseURL}/${pathToAppend}?${encodedParams}`;
         }
-        return `${this._baseURL}${pathToAppend}`;
+        return `${this._baseURL}/${pathToAppend}`;
     }
 
     //
@@ -383,12 +370,18 @@ class DefaultTransactionContext implements TransactionContext {
         // Ensure that asynchronous functions don't lose their 'this' context
         this.open = this.open.bind(this);
         this.execute = this.execute.bind(this);
-        this.close = this.close.bind(this);
+        this.commit = this.commit.bind(this);
         this.rollback = this.rollback.bind(this);
 
         this.uuid = CompletablePromise.newPromise();
     }
 
+    // Doc inherited from `EditTransaction` interface
+    getModelURI(): string {
+        return this.modelURI;
+    }
+
+    // Doc inherited from `EditTransaction` interface
     isOpen(): boolean {
         return !!this.socket && this.socket.readyState === WebSocket.OPEN;
     }
@@ -443,6 +436,14 @@ class DefaultTransactionContext implements TransactionContext {
      */
     getUUID(): PromiseLike<string> {
         return this.uuid;
+    }
+
+    // Doc inherited from `EditTransaction` interface
+    edit(patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
+        if (isModelServerCommand(patchOrCommand)) {
+            return this.execute(this.getModelURI(), patchOrCommand);
+        }
+        return this.applyPatch(patchOrCommand);
     }
 
     // Doc inherited from `Executor` interface
@@ -606,8 +607,8 @@ class DefaultTransactionContext implements TransactionContext {
         }
     }
 
-    // Doc inherited from `TransactionContext` interface
-    async close(): Promise<ModelUpdateResult> {
+    // Doc inherited from `EditTransaction` interface
+    async commit(): Promise<ModelUpdateResult> {
         const updateResult = this.popNestedContext();
 
         if (!this.isOpen()) {
@@ -635,7 +636,7 @@ class DefaultTransactionContext implements TransactionContext {
         return triggers && (typeof triggers === 'function' || triggers.length > 0);
     }
 
-    // Doc inherited from `TransactionContext` interface
+    // Doc inherited from `EditTransaction` interface
     async rollback(error: any): Promise<ModelUpdateResult> {
         if (this.isOpen()) {
             this.socket.send(JSON.stringify(this.message('roll-back', { error })));
@@ -682,6 +683,29 @@ class DefaultTransactionContext implements TransactionContext {
             modelUri: this.modelURI,
             data
         };
+    }
+
+    // Open a child transaction
+    openTransaction(): Promise<TransactionContext> {
+        // Push a nested context onto the stack for this child transaction
+        this.pushNestedContext();
+
+        // Mostly, a child transaction just delegates to the parent, especially to
+        // pass edits to the upstream server. The main difference is that a commit
+        // just pops the nested context
+        const result = {
+            getModelURI: this.getModelURI.bind(this),
+            isOpen: this.isOpen.bind(this),
+            edit: this.edit.bind(this),
+            applyPatch: this.applyPatch.bind(this),
+            execute: this.execute.bind(this),
+            openTransaction: this.openTransaction.bind(this),
+            rollback: this.rollback.bind(this),
+            // This is the slight wrinkle
+            commit: this.popNestedContext.bind(this)
+        };
+
+        return Promise.resolve(result);
     }
 }
 

@@ -13,6 +13,7 @@ export * from './command-provider';
 export * from './executor';
 export * from './logger';
 export * from './model-server-client';
+export * from './model-service';
 export * from './plugin';
 export * from './route-provider';
 export * from './trigger-provider';

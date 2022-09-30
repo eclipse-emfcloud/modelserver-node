@@ -9,13 +9,20 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 
-import { ModelServerClientApi, ModelServerPluginContext } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import {
+    ModelServerClientApi,
+    ModelServerPluginContext,
+    ModelService,
+    ModelServiceFactory
+} from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { ContainerModule } from 'inversify';
 
 import { InternalModelServerClient, InternalModelServerClientApi } from './client/model-server-client';
 import { CommandProviderRegistry } from './command-provider-registry';
 import { BasicModelServerPluginContext, InternalModelServerPluginContext } from './plugin-context';
 import { ModelServer } from './server';
+import { EditService } from './services/edit-service';
+import { DefaultModelService, MODEL_URI } from './services/model-service';
 import { SubscriptionManager } from './services/subscription-manager';
 import { ValidationManager } from './services/validation-manager';
 import { TriggerProviderRegistry } from './trigger-provider-registry';
@@ -31,6 +38,14 @@ export default new ContainerModule(bind => {
 
     bind(SubscriptionManager).toSelf().inSingletonScope();
     bind(ValidationManager).toSelf().inSingletonScope();
+    bind(EditService).toSelf().inSingletonScope();
+    bind(DefaultModelService).toSelf();
+    bind(ModelService).toService(DefaultModelService);
+    bind(ModelServiceFactory).toFactory(context => (modeluri: string) => {
+        const child = context.container.createChild();
+        child.bind(MODEL_URI).toConstantValue(modeluri);
+        return child.get(ModelService);
+    });
 
     bind(BasicModelServerPluginContext).toSelf().inSingletonScope();
     bind(ModelServerPluginContext).toService(InternalModelServerPluginContext);
