@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
-import { MiddlewareProvider, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { MiddlewareProvider, RouteProvider, RouterFactory, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as chai from 'chai';
 import { expect } from 'chai';
@@ -24,6 +24,7 @@ import * as WebSocket from 'ws';
 import { InternalModelServerClientApi, TransactionContext } from './client/model-server-client';
 import { createContainer } from './di';
 import { ModelServer } from './server';
+import { TriggerProviderRegistry } from './trigger-provider-registry';
 
 /**
  * Integration tests for the server.
@@ -260,6 +261,21 @@ describe('Server Integration Tests', () => {
 
         afterEach(async () => {
             transaction.rollback('Test completed, rollback.');
+            await awaitClosed(transaction);
+        });
+
+        it('isOpen()', async () => {
+            expect(transaction.isOpen()).to.be.true;
+        });
+
+        it('transaction already open', async () => {
+            try {
+                const duplicate = await client.openTransaction('SuperBrewer3000.coffee');
+                await duplicate.rollback('Should not have been openeded.');
+                expect.fail('Should not have been able to open duplicate transaction.');
+            } catch (error) {
+                // Success case
+            }
         });
 
         it('Aggregation of model update results', async () => {
@@ -311,6 +327,63 @@ describe('Server Integration Tests', () => {
                     }
                 ]
             });
+        });
+    });
+
+    describe('TransactionContext Robust to Exceptions', async () => {
+        const server: ServerFixture = new ServerFixture();
+        server.requireUpstreamServer();
+
+        let client: InternalModelServerClientApi;
+
+        before(async () => {
+            // Create an internal client with transaction capability and a trigger provider that bombs
+            const bomber: TriggerProvider = {
+                canTrigger: () => true,
+                getTriggers: () => {
+                    throw Error('Boom!');
+                }
+            };
+            client = await createContainer(8081, 'error').then(container => {
+                const registry: TriggerProviderRegistry = container.get(TriggerProviderRegistry);
+                registry.register(bomber);
+
+                const result: InternalModelServerClientApi = container.get(InternalModelServerClientApi);
+                result.initialize();
+
+                return result;
+            });
+        });
+
+        it('Transaction rolled back by failure', async () => {
+            const patch: Operation = { op: 'replace', path: '/workflows/0/name', value: 'New Name' };
+
+            const transaction1 = await client.openTransaction('SuperBrewer3000.coffee');
+
+            try {
+                await transaction1.applyPatch(patch);
+                await transaction1.close();
+                expect.fail('Close should have thrown.');
+            } catch (error) {
+                expect(error.toString()).to.have.string('Boom!');
+            }
+
+            // The transaction should have rolled back and so not be open
+            await awaitClosed(transaction1);
+            expect(transaction1.isOpen()).to.be.false;
+
+            // Should be able to open a new transaction
+            const transaction2 = await client.openTransaction('SuperBrewer3000.coffee');
+            expect(transaction2.isOpen()).to.be.true;
+
+            try {
+                const update = await transaction2.applyPatch(patch);
+                expect(update).to.be.like({ success: true, patch: [patch] });
+            } catch (error) {
+                expect.fail(`Should not have failed to execute patch in new transaction: ${error}`);
+            } finally {
+                transaction2.rollback('Test completed, rollback.');
+            }
         });
     });
 });
@@ -403,5 +476,24 @@ function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) =>
     }).then(result => {
         timeout.clear();
         return result;
+    });
+}
+
+function awaitClosed(transaction: TransactionContext): Promise<boolean> {
+    let timeout: SocketTimeout;
+
+    return new Promise(resolve => {
+        const check = setInterval(() => {
+            if (!transaction.isOpen()) {
+                clearInterval(check);
+                timeout.clear();
+                resolve(true);
+            }
+        }, 50);
+
+        timeout = socketTimeout(transaction['socket'], reason => {
+            clearInterval(check);
+            resolve(false);
+        });
     });
 }
