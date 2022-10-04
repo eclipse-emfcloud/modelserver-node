@@ -66,7 +66,8 @@ export interface InternalModelServerClientApi extends ModelServerClientApi {
      * Open a transactional self-compounding command/patch execution context on a model.
      *
      * @param modeluri the URI of the model on which to open the transaction
-     * @returns a transactional context in which to execute a chained sequence of commands
+     * @returns a transactional context in which to execute a chained sequence of commands,
+     *     or a rejected promise in the case that a transaction is already open on the given model
      */
     openTransaction(modeluri: string): Promise<TransactionContext>;
 }
@@ -75,6 +76,11 @@ export interface InternalModelServerClientApi extends ModelServerClientApi {
  * Protocol for the client-side context of an open transaction on a model URI.
  */
 export interface TransactionContext extends Executor {
+    /**
+     * Query whether the transaction is currently open.
+     */
+    isOpen(): boolean;
+
     /**
      * Close the transaction, putting the compound of all commands executed within its span
      * onto the stack for undo/redo.
@@ -177,6 +183,10 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     }
 
     async openTransaction(modelURI: string): Promise<TransactionContext> {
+        if (this.transactions.has(modelURI)) {
+            return Promise.reject(Error(`Transaction already open on model ${modelURI}`));
+        }
+
         const clientID = uuid();
 
         return axios.post(this.makeURL('transaction', { modeluri: modelURI }), { data: clientID }).then(response => {
@@ -188,6 +198,7 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
                 this.triggerProviderRegistry,
                 this.logger
             );
+            this.transactions.set(modelURI, result);
             return result.open(tc => this.closeTransaction(modelURI, tc));
         });
     }
@@ -356,8 +367,6 @@ interface NestedEditContext {
  * Default implementation of the client-side transaction context with socket message handling.
  */
 class DefaultTransactionContext implements TransactionContext {
-    private closeCallback: (tc: TransactionContext) => void;
-
     private socket: WebSocket;
 
     private nestedContexts: NestedEditContext[] = [];
@@ -380,6 +389,10 @@ class DefaultTransactionContext implements TransactionContext {
         this.uuid = CompletablePromise.newPromise();
     }
 
+    isOpen(): boolean {
+        return !!this.socket && this.socket.readyState === WebSocket.OPEN;
+    }
+
     /**
      * Open a new transaction on the upstream _Model Server_.
      *
@@ -388,14 +401,12 @@ class DefaultTransactionContext implements TransactionContext {
      */
     open(closeCallback: (tc: TransactionContext) => void): Promise<TransactionContext> {
         const result: Promise<TransactionContext> = new Promise((resolveTransaction, reject) => {
-            this.closeCallback = closeCallback;
-
             const wsURI = new URL(this.transactionURI);
             wsURI.protocol = 'ws';
             const socket = new WebSocket(wsURI.toString());
 
             socket.onclose = event => {
-                this.closeCallback.apply(this);
+                closeCallback?.(this);
                 this.socket = undefined;
             };
             socket.onopen = event => {
@@ -436,7 +447,7 @@ class DefaultTransactionContext implements TransactionContext {
 
     // Doc inherited from `Executor` interface
     async applyPatch(patch: Operation | Operation[]): Promise<ModelUpdateResult> {
-        if (!this.socket) {
+        if (!this.isOpen()) {
             return Promise.reject('Socket is closed.');
         }
 
@@ -444,7 +455,22 @@ class DefaultTransactionContext implements TransactionContext {
             return { success: false };
         }
 
-        return this.sendPatch(patch);
+        return this.autoRollback(this.sendPatch(patch));
+    }
+
+    /**
+     * Wrap an edit result to roll back the transaction automatically if the edit
+     * fails with an exception.
+     *
+     * @param editResult the promise to wrap
+     * @returns the wrapped edit result promise
+     */
+    protected autoRollback<T>(editResult: Promise<T>): Promise<T> {
+        return editResult.catch(async reason => {
+            this.logger.error(`Transaction rolling back due to exception: ${reason}`);
+            await this.rollback(reason);
+            throw reason;
+        });
     }
 
     private async sendPatch(patch: Operation | Operation[]): Promise<ModelUpdateResult> {
@@ -456,10 +482,15 @@ class DefaultTransactionContext implements TransactionContext {
 
     // Doc inherited from `Executor` interface
     async execute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
-        if (!this.socket) {
+        if (!this.isOpen()) {
             return Promise.reject('Socket is closed.');
         }
 
+        return this.autoRollback(this.doExecute(modelUri, command));
+    }
+
+    /** Internal implementation of the {@link TransactionContext.execute} method. */
+    async doExecute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
         // Hook in command-provider plug-ins
         if (!this.commandProviderRegistry.hasProvider(command.type)) {
             // Not handled. Send along to the Model Server
@@ -495,7 +526,7 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     private async sendExecuteMessage(body: ExecuteMessageBody): Promise<ModelUpdateResult> {
-        if (!this.socket) {
+        if (!this.isOpen()) {
             return Promise.reject('Socket is closed.');
         }
 
@@ -579,13 +610,13 @@ class DefaultTransactionContext implements TransactionContext {
     async close(): Promise<ModelUpdateResult> {
         const updateResult = this.popNestedContext();
 
-        if (!this.socket) {
+        if (!this.isOpen()) {
             return transactionClosed;
         }
 
         let modelDelta = updateResult.patch;
         while (modelDelta && modelDelta.length) {
-            const triggers = await this.triggerProviderRegistry.getTriggers(this.modelURI, modelDelta);
+            const triggers = await this.autoRollback(this.triggerProviderRegistry.getTriggers(this.modelURI, modelDelta));
             if (!this.hasTriggers(triggers)) {
                 // Nothing left to process
                 modelDelta = undefined;
@@ -606,7 +637,7 @@ class DefaultTransactionContext implements TransactionContext {
 
     // Doc inherited from `TransactionContext` interface
     async rollback(error: any): Promise<ModelUpdateResult> {
-        if (this.socket) {
+        if (this.isOpen()) {
             this.socket.send(JSON.stringify(this.message('roll-back', { error })));
         }
         return transactionClosed;
