@@ -14,21 +14,18 @@ import {
     CompoundCommand,
     encode,
     ModelServerCommand,
-    ModelUpdateResult,
     RemoveCommand,
     SetCommand
 } from '@eclipse-emfcloud/modelserver-client';
-import { Executor, Logger, RouteProvider, RouterFactory, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { Operation } from 'fast-json-patch';
-import { ServerResponse } from 'http';
 import { inject, injectable, named } from 'inversify';
 
-import { ExecuteMessageBody, InternalModelServerClientApi, isModelServerCommand, TransactionContext } from '../client/model-server-client';
-import { CommandProviderRegistry } from '../command-provider-registry';
+import { ExecuteMessageBody, InternalModelServerClientApi, isModelServerCommand } from '../client/model-server-client';
+import { EditService } from '../services/edit-service';
 import { ValidationManager } from '../services/validation-manager';
-import { TriggerProviderRegistry } from '../trigger-provider-registry';
-import { handleError, relay, respondError, validateFormat } from './routes';
+import { handleError, relay, validateFormat } from './routes';
 
 /**
  * Query parameters for the `POST` or `PUT` request on the `models` endpoint.
@@ -61,11 +58,8 @@ export class ModelsRoutes implements RouteProvider {
     @inject(InternalModelServerClientApi)
     protected readonly modelServerClient: InternalModelServerClientApi;
 
-    @inject(CommandProviderRegistry)
-    protected readonly commandProviderRegistry: CommandProviderRegistry;
-
-    @inject(TriggerProviderRegistry)
-    protected readonly triggerProviderRegistry: TriggerProviderRegistry;
+    @inject(EditService)
+    protected readonly editService: EditService;
 
     @inject(ValidationManager)
     protected readonly validationManager: ValidationManager;
@@ -137,95 +131,16 @@ export class ModelsRoutes implements RouteProvider {
                 return;
             }
 
-            return isCustomCommand(command) ? this.handleCommand(modelURI, command, res) : this.forwardEdit(modelURI, command, res);
+            return this.forwardEdit(modelURI, command, res);
         };
-    }
-
-    protected async handleCommand(modelURI: string, command: ModelServerCommand, res: Response<any, Record<string, any>>): Promise<void> {
-        this.logger.debug(`Getting commands provided for ${command.type}`);
-
-        const provided = await this.commandProviderRegistry.getCommands(modelURI, command);
-        this.forwardEdit(modelURI, provided, res);
     }
 
     protected forwardEdit(
         modelURI: string,
-        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
+        patchOrCommand: Operation | Operation[] | ModelServerCommand,
         res: Response<any, Record<string, any>>
     ): void {
-        if (this.triggerProviderRegistry.hasProviders()) {
-            return this.forwardEditWithTriggers(modelURI, providedEdit, res);
-        }
-        return this.forwardEditSimple(modelURI, providedEdit, res);
-    }
-
-    private forwardEditSimple(
-        modelURI: string,
-        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
-        res: Response<any, Record<string, any>>
-    ): void {
-        if (typeof providedEdit === 'function') {
-            // It's a transaction function
-            this.modelServerClient
-                .openTransaction(modelURI)
-                .then(ctx =>
-                    providedEdit(ctx)
-                        .then(completeTransaction(ctx, res))
-                        .then(this.performPatchValidation(modelURI))
-                        .catch(error => ctx.rollback(error).finally(() => respondError(res, error)))
-                )
-                .catch(handleError(res));
-        } else {
-            // It's a substitute command or JSON Patch. Just execute/apply it in the usual way
-            let result: Promise<ModelUpdateResult>;
-
-            if (isModelServerCommand(providedEdit)) {
-                // Command case
-                result = this.modelServerClient.edit(modelURI, providedEdit);
-            } else {
-                // JSON Patch case
-                result = this.modelServerClient.edit(modelURI, providedEdit);
-            }
-
-            result.then(this.performPatchValidation(modelURI)).then(relay(res)).catch(handleError(res));
-        }
-    }
-
-    private forwardEditWithTriggers(
-        modelURI: string,
-        providedEdit: ModelServerCommand | Operation | Operation[] | Transaction,
-        res: Response<any, Record<string, any>>
-    ): void {
-        let result = true;
-
-        // Perform the edit in a transaction, then gather triggers, and recurse
-        const triggeringTransaction = async (executor: Executor): Promise<boolean> => {
-            if (typeof providedEdit === 'function') {
-                // It's a transaction function
-                result = await providedEdit(executor);
-            } else {
-                // It's a command or JSON Patch. Just execute/apply it in the usual way
-                if (isModelServerCommand(providedEdit)) {
-                    // Command case
-                    await executor.execute(modelURI, providedEdit);
-                } else {
-                    // JSON Patch case
-                    await executor.applyPatch(providedEdit);
-                }
-            }
-
-            return result;
-        };
-
-        this.modelServerClient
-            .openTransaction(modelURI)
-            .then(ctx =>
-                triggeringTransaction(ctx)
-                    .then(completeTransaction(ctx, res)) // The transaction context performs the triggers
-                    .then(this.performPatchValidation(modelURI))
-                    .catch(error => ctx.rollback(error).finally(() => respondError(res, error)))
-            )
-            .catch(handleError(res));
+        this.editService.edit(modelURI, patchOrCommand).then(relay(res)).catch(handleError(res));
     }
 
     /**
@@ -238,24 +153,6 @@ export class ModelsRoutes implements RouteProvider {
         const validator = this.validationManager;
 
         return async (delegatedResult: AnyObject) => validator.performLiveValidation(modelURI).then(() => delegatedResult);
-    }
-
-    /**
-     * Follow up patch of a model with validation of the same.
-     *
-     * @param modelURI the model patched
-     * @returns a function that performs live validation on a model update result if it was successful
-     */
-    protected performPatchValidation(modelURI: string): (validate: ModelUpdateResult) => Promise<ModelUpdateResult> {
-        const validator = this.validationManager;
-
-        return async (validate: ModelUpdateResult) => {
-            if (validate.success) {
-                return validator.performLiveValidation(modelURI).then(() => validate);
-            }
-            this.logger.debug('Not validating the failed command/patch.');
-            return validate;
-        };
     }
 }
 
@@ -312,41 +209,4 @@ function asModelServerCommand(command: any): ModelServerCommand | undefined {
     }
 
     return undefined;
-}
-
-function isCustomCommand(command: ModelServerCommand): boolean {
-    return !(SetCommand.is(command) || AddCommand.is(command) || RemoveCommand.is(command));
-}
-
-/**
- * Complete a `transaction` and send a success or error response back to the upstream client according to whether
- * the downstream transaction completed successfully or not.
- *
- * @param transaction the transaction context to complete
- * @param upstream the upstream response stream to which to send the result of transaction completion
- * @returns a function that takes a downstream response and sends an error response if it is not a success response,
- *    otherwise a success response
- */
-function completeTransaction(
-    transaction: TransactionContext,
-    upstream: Response<any, Record<string, any>>
-): (downstream: boolean) => Promise<ModelUpdateResult> {
-    return async downstream => {
-        if (!downstream) {
-            const reason = 'Transaction failed';
-            return transaction.rollback(reason).finally(() => respondError(upstream, reason));
-        } else {
-            return transaction //
-                .close()
-                .then(relay(upstream))
-                .catch(respondUpdateError(upstream));
-        }
-    };
-}
-
-function respondUpdateError(upstream: ServerResponse): (reason: any) => ModelUpdateResult {
-    return reason => {
-        respondError(upstream, reason);
-        return { success: false };
-    };
 }

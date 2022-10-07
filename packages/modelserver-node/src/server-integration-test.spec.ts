@@ -9,12 +9,18 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
-import { MiddlewareProvider, RouteProvider, RouterFactory, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import {
+    EditTransaction,
+    MiddlewareProvider,
+    RouteProvider,
+    RouterFactory,
+    TriggerProvider
+} from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as chai from 'chai';
 import { expect } from 'chai';
 import * as chaiLike from 'chai-like';
-import { IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
+import { IRoute, IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
 import { Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
 import * as sinon from 'sinon';
@@ -36,13 +42,13 @@ export const integrationTests = undefined;
 
 chai.use(chaiLike);
 
-type MockMiddleware = sinon.SinonSpy<[req: Request, res: Response, next: NextFunction], any>;
+export type MockMiddleware = sinon.SinonSpy<[req: Request, res: Response, next: NextFunction], any>;
 
-interface CoffeeMachine extends ModelServerObjectV2 {
+export interface CoffeeMachine extends ModelServerObjectV2 {
     name?: string;
 }
 
-namespace CoffeeMachine {
+export namespace CoffeeMachine {
     export const TYPE = 'http://www.eclipsesource.com/modelserver/example/coffeemodel#//Machine';
 }
 
@@ -78,7 +84,7 @@ class UpstreamServer {
 }
 
 /** Test fixture wrapping an Inversify-configured _Model Server_ that is started up and stopped for each test case. */
-class ServerFixture {
+export class ServerFixture {
     static upstream = new UpstreamServer();
 
     readonly baseUrl: string;
@@ -260,8 +266,13 @@ describe('Server Integration Tests', () => {
         });
 
         afterEach(async () => {
-            transaction.rollback('Test completed, rollback.');
-            await awaitClosed(transaction);
+            if (transaction.isOpen()) {
+                transaction.rollback('Test completed, rollback.');
+                await awaitClosed(transaction);
+            } else {
+                // Don't interfere with the data expected by other tests
+                await client.undo('SuperBrewer3000.coffee');
+            }
         });
 
         it('isOpen()', async () => {
@@ -271,7 +282,7 @@ describe('Server Integration Tests', () => {
         it('transaction already open', async () => {
             try {
                 const duplicate = await client.openTransaction('SuperBrewer3000.coffee');
-                await duplicate.rollback('Should not have been openeded.');
+                await duplicate.rollback('Should not have been opened.');
                 expect.fail('Should not have been able to open duplicate transaction.');
             } catch (error) {
                 // Success case
@@ -294,7 +305,9 @@ describe('Server Integration Tests', () => {
                 const update2 = await transaction.applyPatch(patch2);
                 expect(update2).to.be.like({ success: true, patch: [patch2] });
             } finally {
-                const aggregated = await transaction.close();
+                const aggregated = await transaction.commit();
+                await awaitClosed(transaction);
+
                 expect(aggregated).to.be.like({
                     success: true,
                     patch: [patch1, patch2]
@@ -362,7 +375,7 @@ describe('Server Integration Tests', () => {
 
             try {
                 await transaction1.applyPatch(patch);
-                await transaction1.close();
+                await transaction1.commit();
                 expect.fail('Close should have thrown.');
             } catch (error) {
                 expect(error.toString()).to.have.string('Boom!');
@@ -388,7 +401,7 @@ describe('Server Integration Tests', () => {
     });
 });
 
-function isCoffeeMachine(obj: unknown): obj is CoffeeMachine {
+export function isCoffeeMachine(obj: unknown): obj is CoffeeMachine {
     return ModelServerObjectV2.is(obj) && obj.$type === CoffeeMachine.TYPE;
 }
 
@@ -400,7 +413,7 @@ function isCoffeeMachine(obj: unknown): obj is CoffeeMachine {
  * @param forRoute the specific route for which to provide the middleware, or omitted to provide the middleware on all routes
  * @returns a mock middleware for Sinon spy assertions
  */
-function provideMiddleware(container: Container, forRoute?: string): MockMiddleware {
+export function provideMiddleware(container: Container, forRoute?: string): MockMiddleware {
     const result: MockMiddleware = sinon.spy((req, res, next) => next());
     const middlewareProvider: MiddlewareProvider = {
         getMiddlewares(router: IRouter, aRoute: string) {
@@ -412,16 +425,16 @@ function provideMiddleware(container: Container, forRoute?: string): MockMiddlew
     return result;
 }
 
-type SupportedMethod = 'get' | 'put' | 'post' | 'patch' | 'delete';
-interface CustomRoute {
+export type SupportedMethod = keyof Pick<IRoute, 'get' | 'put' | 'post' | 'patch' | 'delete'>;
+export interface CustomRoute {
     method: SupportedMethod;
     path: string;
     handler: RequestHandler;
 }
 
-function route(method: SupportedMethod, handler: RequestHandler): CustomRoute;
-function route(method: SupportedMethod, path: string, handler: RequestHandler): CustomRoute;
-function route(method: SupportedMethod, path?: string | RequestHandler, handler?: RequestHandler): CustomRoute {
+export function route(method: SupportedMethod, handler: RequestHandler): CustomRoute;
+export function route(method: SupportedMethod, path: string, handler: RequestHandler): CustomRoute;
+export function route(method: SupportedMethod, path?: string | RequestHandler, handler?: RequestHandler): CustomRoute {
     if (typeof path === 'function') {
         handler = path;
         path = '/';
@@ -435,7 +448,7 @@ function route(method: SupportedMethod, path?: string | RequestHandler, handler?
     return { method, path, handler };
 }
 
-function provideEndpoint(container: Container, basePath: string, ...routes: CustomRoute[]): void {
+export function provideEndpoint(container: Container, basePath: string, ...routes: CustomRoute[]): void {
     const provider: RouteProvider = {
         configureRoutes(routerFactory: RouterFactory) {
             const router = routerFactory(basePath);
@@ -445,11 +458,11 @@ function provideEndpoint(container: Container, basePath: string, ...routes: Cust
     container.bind(RouteProvider).toConstantValue(provider);
 }
 
-interface SocketTimeout {
+export interface SocketTimeout {
     clear(): void;
 }
 
-function socketTimeout(ws: WebSocket, reject: (reason?: any) => void): SocketTimeout {
+export function socketTimeout(ws: WebSocket, reject: (reason?: any) => void): SocketTimeout {
     const result = setTimeout(() => {
         ws.close();
         reject(new Error('timeout'));
@@ -463,7 +476,7 @@ function socketTimeout(ws: WebSocket, reject: (reason?: any) => void): SocketTim
     };
 }
 
-function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) => boolean): Promise<WebSocket.MessageEvent> {
+export function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) => boolean): Promise<WebSocket.MessageEvent> {
     let timeout: SocketTimeout;
 
     return new Promise<WebSocket.MessageEvent>((resolve, reject) => {
@@ -479,7 +492,7 @@ function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) =>
     });
 }
 
-function awaitClosed(transaction: TransactionContext): Promise<boolean> {
+export function awaitClosed(transaction: EditTransaction): Promise<boolean> {
     let timeout: SocketTimeout;
 
     return new Promise(resolve => {
