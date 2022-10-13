@@ -47,9 +47,15 @@ export class ValidationManager {
     }
 
     async validate(modelURI: string): Promise<Diagnostic> {
-        const model = await this.modelServerClient.get(modelURI).then(asModelServerObject);
-        if (!model) {
-            throw new Error('Could not retrieve model to validate.');
+        let model: ModelServerObjectV2;
+        try {
+            model = await this.modelServerClient.get(modelURI).then(asModelServerObject);
+            if (!model) {
+                throw new Error(`Could not retrieve model '${modelURI}' to validate.`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to retrieve model '${modelURI}' to validate: ${error}`);
+            throw error;
         }
 
         this.logger.debug(`Performing core validation of ${modelURI}`);
@@ -86,7 +92,9 @@ export class ValidationManager {
     }
 
     protected async initializeLiveValidation(client: JSONSocket, modelURI: string): Promise<unknown> {
-        return this.validate(modelURI).then(diagnostics => this.subscriptionManager.sendValidation(client, diagnostics));
+        return this.validate(modelURI)
+            .then(diagnostics => this.subscriptionManager.sendValidation(client, diagnostics))
+            .catch(error => this.logger.error(`Failed to initialize live validation in subscription to ${modelURI}: ${error}`));
     }
 }
 
