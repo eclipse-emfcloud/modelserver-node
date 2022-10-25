@@ -33,6 +33,7 @@ import * as chaiLike from 'chai-like';
 import { getValueByPointer, Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
 import { Context } from 'mocha';
+import * as URI from 'urijs';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { awaitClosed, CoffeeMachine, isCoffeeMachine, ServerFixture } from '../server-integration-test.spec';
@@ -54,7 +55,7 @@ const pass = (): void => {};
 
 describe('DefaultModelService', () => {
     let assumeThat: (...args: Parameters<typeof _assumeThat>) => void;
-    const modelURI = 'SuperBrewer3000.coffee';
+    const modelURI = new URI('SuperBrewer3000.coffee');
     const diagnosticSource = 'Mocha Tests';
     let client: ModelServerClientApi;
     let container: Container; // An independent client for model fixture maintenance
@@ -125,7 +126,7 @@ describe('DefaultModelService', () => {
             expect(result.patch).to.be.like([patch]);
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
@@ -143,12 +144,12 @@ describe('DefaultModelService', () => {
             unregister();
 
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
     it('edit(command)', async () => {
-        const model = await client.get(modelURI);
+        const model = await client.get(modelURI.toString());
         expect(model['workflows']).to.be.an('array').that.is.not.empty;
         const workflows = requireArray(model, 'workflows');
         const workflow = workflows[0] as ModelServerObjectV2;
@@ -172,12 +173,12 @@ describe('DefaultModelService', () => {
         } finally {
             unregister();
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
     it('edit(command) includes triggers', async () => {
-        const model = await client.get(modelURI);
+        const model = await client.get(modelURI.toString());
         expect(model['workflows']).to.be.an('array').that.is.not.empty;
         const workflows = requireArray(model, 'workflows');
         const workflow = workflows[0] as ModelServerObjectV2;
@@ -206,7 +207,7 @@ describe('DefaultModelService', () => {
             unregisterTrigger();
             unregisterCommand();
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
@@ -237,7 +238,7 @@ describe('DefaultModelService', () => {
             expect(redoResult.patch).to.be.like([patch]);
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
@@ -252,7 +253,7 @@ describe('DefaultModelService', () => {
 
         const transaction = await modelService.openTransaction();
         expect(transaction.isOpen()).to.be.true;
-        expect(transaction.getModelURI()).to.be.string(modelURI);
+        expect(transaction.getModelURI()).to.be.string(modelURI.toString());
 
         const result = await transaction.edit(patch);
         expect(result.success).to.be.true;
@@ -261,7 +262,7 @@ describe('DefaultModelService', () => {
         await transaction.rollback('Testing roll-back.');
         await awaitClosed(transaction);
 
-        const model = await client.get(modelURI);
+        const model = await client.get(modelURI.toString());
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
@@ -280,12 +281,12 @@ describe('DefaultModelService', () => {
 
         try {
             await awaitClosed(transaction);
-            const model = await client.get(modelURI);
+            const model = await client.get(modelURI.toString());
             const actual = getValueByPointer(model, '/workflows/0/name');
             expect(actual).to.be.string('New Name');
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
@@ -309,7 +310,7 @@ describe('DefaultModelService', () => {
         expect(child.isOpen()).to.be.false;
         expect(transaction.isOpen()).to.be.false;
 
-        const model = await client.get(modelURI);
+        const model = await client.get(modelURI.toString());
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
@@ -337,12 +338,12 @@ describe('DefaultModelService', () => {
 
         try {
             await awaitClosed(transaction);
-            const model = await client.get(modelURI);
+            const model = await client.get(modelURI.toString());
             const actual = getValueByPointer(model, '/workflows/0/name');
             expect(actual).to.be.string('New Name');
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI);
+            await client.undo(modelURI.toString());
         }
     });
 
@@ -367,13 +368,13 @@ describe('DefaultModelService', () => {
         await transaction.rollback('Testing parent roll-back.');
         await awaitClosed(transaction);
 
-        const model = await client.get(modelURI);
+        const model = await client.get(modelURI.toString());
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
 
-    describe('Destructive APIs', () => {
-        const newModelURI = 'ModelServiceTest.coffee';
+    describe.only('Destructive APIs', () => {
+        let newModelURI;
         const modelContent: Partial<CoffeeMachine> = {
             $type: CoffeeMachine.TYPE,
             name: 'New Coffee Machine'
@@ -381,6 +382,7 @@ describe('DefaultModelService', () => {
         let newModelService: ModelService;
 
         beforeEach(function () {
+            newModelURI = new URI('ModelServiceTest.coffee');
             assumeThat = _assumeThat.bind(this);
             const modelServiceFactory: ModelServiceFactory = container.get(ModelServiceFactory);
             newModelService = modelServiceFactory(newModelURI);
@@ -388,11 +390,11 @@ describe('DefaultModelService', () => {
 
         afterEach(async () => {
             const uris = await client.getModelUris();
-            if (!uris.includes(newModelURI)) {
+            if (!uris.includes(newModelURI.toString())) {
                 return Promise.resolve();
             } else {
                 // Clean up this model
-                return client.delete(newModelURI).catch(pass);
+                return client.delete(newModelURI.toString()).catch(pass);
             }
         });
 
@@ -400,7 +402,7 @@ describe('DefaultModelService', () => {
             const result = await newModelService.create(modelContent);
             expect(result).to.be.like(modelContent);
 
-            const actual = await client.get(newModelURI, isCoffeeMachine);
+            const actual = await client.get(newModelURI.toString(), isCoffeeMachine);
             expect(actual).to.be.like(modelContent);
         });
 
@@ -408,6 +410,7 @@ describe('DefaultModelService', () => {
             const model = await newModelService.create(modelContent);
             assumeThat(!!model, 'Model not created.');
 
+            // FIXME subscription is not triggered in listenForFullUpdate
             const { ready, done: closed } = listenForFullUpdate(client, newModelURI, 'close');
             await ready;
 
@@ -418,7 +421,7 @@ describe('DefaultModelService', () => {
                 const actual = await closed;
                 expect(actual).to.be.true;
             } finally {
-                client.unsubscribe(newModelURI);
+                client.unsubscribe(newModelURI.toString());
             }
         });
 
@@ -427,7 +430,7 @@ describe('DefaultModelService', () => {
             assumeThat(!!model, 'Model not created.');
 
             const patch: Operation = { op: 'replace', path: '/name', value: 'New Name' };
-            const edited = await client.edit(newModelURI, patch);
+            const edited = await client.edit(newModelURI.toString(), patch);
             assumeThat(edited.success, 'Model edit failed.');
 
             const dirtyState = new Promise<boolean>(resolve => {
@@ -441,8 +444,8 @@ describe('DefaultModelService', () => {
                         }
                     }
                 };
-
-                client.subscribe(newModelURI, new NotificationSubscriptionListenerV2(listener));
+                // FIXME subscription is not triggered
+                client.subscribe(newModelURI.toString(), new NotificationSubscriptionListenerV2(listener));
             });
 
             try {
@@ -452,7 +455,7 @@ describe('DefaultModelService', () => {
                 const actual = await dirtyState;
                 expect(actual).to.be.false;
             } finally {
-                client.unsubscribe(newModelURI);
+                client.unsubscribe(newModelURI.toString());
             }
         });
 
@@ -460,6 +463,7 @@ describe('DefaultModelService', () => {
             const model = await newModelService.create(modelContent);
             assumeThat(!!model, 'Model not created.');
 
+            // FIXME subscription is not triggered in listenForFullUpdate
             const { ready, done: deleted } = listenForFullUpdate(client, newModelURI, 'delete');
             await ready;
 
@@ -470,7 +474,7 @@ describe('DefaultModelService', () => {
                 const actual = await deleted;
                 expect(actual).to.be.true;
             } finally {
-                client.unsubscribe(newModelURI);
+                client.unsubscribe(newModelURI.toString());
             }
         });
     });
@@ -564,7 +568,7 @@ function registerCommand(commandRegistry: CommandProviderRegistry): () => void {
  */
 function listenForFullUpdate(
     client: ModelServerClientApi,
-    modelURI: string,
+    modelURI: URI,
     mode: 'close' | 'delete'
 ): { ready: Promise<boolean>; done: Promise<boolean> } {
     let result: Promise<boolean>;
@@ -589,10 +593,9 @@ function listenForFullUpdate(
                 onOpen: () => resolveListening(true),
                 onClose: pass
             };
-
-            client.subscribe(modelURI, listener);
+            // FIXME subscription is not triggered
+            client.subscribe(modelURI.toString(), listener);
         });
     });
-
     return { ready: listening, done: result! };
 }

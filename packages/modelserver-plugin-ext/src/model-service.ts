@@ -11,6 +11,7 @@
 
 import { AnyObject, Diagnostic, Format, ModelServerCommand, ModelUpdateResult, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
 import { Operation } from 'fast-json-patch';
+import * as URI from 'urijs';
 
 export const ModelServiceFactory = Symbol('ModelServiceFactory');
 export const ModelService = Symbol('ModelService');
@@ -18,7 +19,7 @@ export const ModelService = Symbol('ModelService');
 /**
  * A factory that obtains the `ModelService` for a particular model URI.
  */
-export type ModelServiceFactory = (modeluri: string) => ModelService;
+export type ModelServiceFactory = (modeluri: URI) => ModelService;
 
 /**
  * A service that plug-in extensions may use to create, access, and modify a model.
@@ -37,7 +38,7 @@ export interface ModelService {
      *
      * @returns my model's URI
      */
-    getModelURI(): string;
+    getModelURI(): URI;
 
     /**
      * Get the content of my model. If the `format` is omitted and a request needs to be

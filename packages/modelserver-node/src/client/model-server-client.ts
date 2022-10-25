@@ -31,12 +31,14 @@ import { EditTransaction, Executor, Logger, ModelServerClientApi, Transaction } 
 import axios from 'axios';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 import { v4 as uuid } from 'uuid';
 import * as WebSocket from 'ws';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { CompletablePromise } from './promise-utils';
+import { validateModelURI } from './uri-utils';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -160,52 +162,58 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
 
     protected readonly delegate: ModelServerClientApi = new ModelServerClientV2();
 
-    protected _baseURL: string;
+    protected _baseURL: URI;
 
     initialize(): void | Promise<void> {
-        const basePath = this.upstreamConnectionConfig.baseURL.replace(/^\/+/, '').replace(/\/+$/, '');
-        this._baseURL = `http://${this.upstreamConnectionConfig.hostname}:${this.upstreamConnectionConfig.serverPort}/${basePath}`;
-        return this.delegate.initialize(this._baseURL, DEFAULT_FORMAT);
+        this._baseURL = new URI({
+            protocol: 'http',
+            hostname: this.upstreamConnectionConfig.hostname,
+            port: this.upstreamConnectionConfig.serverPort,
+            path: this.upstreamConnectionConfig.baseURL
+        });
+        return this.delegate.initialize(this._baseURL.toString(), DEFAULT_FORMAT);
     }
 
-    async openTransaction(modelURI: string): Promise<TransactionContext> {
-        if (this.transactions.has(modelURI)) {
+    async openTransaction(modelUri: string): Promise<TransactionContext> {
+        let uri: URI;
+        try {
+            uri = validateModelURI(modelUri);
+        } catch (error) {
+            this.logger.error(error);
+            return Promise.reject();
+        }
+        if (this.transactions.has(uri.toString())) {
             // Open a nested transaction
-            return this.transactions.get(modelURI).openTransaction();
+            return this.transactions.get(uri.toString()).openTransaction();
         }
 
         const clientID = uuid();
 
-        return axios.post(this.makeURL('transaction', { modeluri: modelURI }), { data: clientID }).then(response => {
+        return axios.post(this.makeURL('transaction', { modeluri: uri.toString() }), { data: clientID }).then(response => {
             const { uri: transactionURI } = (response.data as CreateTransactionResponseBody).data;
             const result = new DefaultTransactionContext(
                 transactionURI,
-                modelURI,
+                modelUri,
                 this.commandProviderRegistry,
                 this.triggerProviderRegistry,
                 this.logger
             );
-            this.transactions.set(modelURI, result);
-            return result.open(tc => this.closeTransaction(modelURI, tc));
+            this.transactions.set(uri.toString(), result);
+            return result.open(tc => this.closeTransaction(uri, tc));
         });
     }
 
-    private closeTransaction(modelURI: string, tc: TransactionContext): void {
-        if (this.transactions.get(modelURI) === tc) {
-            this.transactions.delete(modelURI);
+    private closeTransaction(modeluri: URI, tc: TransactionContext): void {
+        if (this.transactions.get(modeluri.toString()) === tc) {
+            this.transactions.delete(modeluri.toString());
         }
     }
 
     protected makeURL(path: string, queryParameters?: any): string {
-        const pathToAppend = path.replace(/^\/+/, ''); // Strip any leading slashes
-
-        if (queryParameters) {
-            const encodedParams = Object.entries(queryParameters)
-                .map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value.toString()))
-                .join('&');
-            return `${this._baseURL}/${pathToAppend}?${encodedParams}`;
-        }
-        return `${this._baseURL}/${pathToAppend}`;
+        const uri = this._baseURL.clone();
+        uri.path(URI.joinPaths(uri.path(), path).toString());
+        uri.addQuery(queryParameters);
+        return uri.toString();
     }
 
     //

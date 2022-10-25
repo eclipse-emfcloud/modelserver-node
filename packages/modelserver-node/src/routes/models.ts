@@ -21,11 +21,13 @@ import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelser
 import { Request, RequestHandler, Response } from 'express';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 import { ExecuteMessageBody, InternalModelServerClientApi, isModelServerCommand } from '../client/model-server-client';
+import { validateModelURI } from '../client/uri-utils';
 import { EditService } from '../services/edit-service';
 import { ValidationManager } from '../services/validation-manager';
-import { handleError, relay, validateFormat } from './routes';
+import { handleError, handleUriError, relay, validateFormat } from './routes';
 
 /**
  * Query parameters for the `POST` or `PUT` request on the `models` endpoint.
@@ -82,9 +84,11 @@ export class ModelsRoutes implements RouteProvider {
             req: Request<unknown, any, any, ModelsPostPutQuery, Record<string, any>>,
             res: Response<any, Record<string, any>>
         ) => {
-            const modelURI = req.query.modeluri?.trim();
-            if (!modelURI || modelURI === '') {
-                handleError(res)('Model URI parameter is absent or empty.');
+            let modeluri: URI;
+            try {
+                modeluri = validateModelURI(req.query.modeluri);
+            } catch (error) {
+                handleUriError(res)(error);
                 return;
             }
             const format = validateFormat(req.query.format);
@@ -96,12 +100,12 @@ export class ModelsRoutes implements RouteProvider {
             }
 
             const isCreate = req.method.toUpperCase() === 'POST';
-            this.logger.debug(`Delegating ${isCreate ? 'creation' : 'update'} of ${modelURI}.`);
+            this.logger.debug(`Delegating ${isCreate ? 'creation' : 'update'} of ${modeluri.toString()}.`);
             const delegated = isCreate //
-                ? this.modelServerClient.create(modelURI, model, format)
-                : this.modelServerClient.update(modelURI, model, format);
+                ? this.modelServerClient.create(modeluri.toString(), model, format)
+                : this.modelServerClient.update(modeluri.toString(), model, format);
 
-            delegated.then(this.performModelValidation(modelURI)).then(relay(res)).catch(handleError(res));
+            delegated.then(this.performModelValidation(modeluri.toString())).then(relay(res)).catch(handleError(res));
         };
     }
 
@@ -114,15 +118,17 @@ export class ModelsRoutes implements RouteProvider {
      */
     protected interceptModelsPatch(): RequestHandler<unknown, any, any, ModelsPatchQuery, Record<string, any>> {
         return async (req: Request<unknown, any, any, ModelsPatchQuery, Record<string, any>>, res: Response<any, Record<string, any>>) => {
-            const modelURI = req.query.modeluri?.trim();
-            if (!modelURI || modelURI === '') {
-                handleError(res)('Model URI parameter is absent or empty.');
+            let modeluri: URI;
+            try {
+                modeluri = validateModelURI(req.query.modeluri);
+            } catch (error) {
+                handleUriError(res)(error);
                 return;
             }
 
             const message = req.body?.data;
             if (message && ExecuteMessageBody.isPatch(message)) {
-                return this.forwardEdit(modelURI, message.data, res);
+                return this.forwardEdit(modeluri, message.data, res);
             }
 
             const command = asModelServerCommand(message?.data);
@@ -131,16 +137,16 @@ export class ModelsRoutes implements RouteProvider {
                 return;
             }
 
-            return this.forwardEdit(modelURI, command, res);
+            return this.forwardEdit(modeluri, command, res);
         };
     }
 
     protected forwardEdit(
-        modelURI: string,
+        modelURI: URI,
         patchOrCommand: Operation | Operation[] | ModelServerCommand,
         res: Response<any, Record<string, any>>
     ): void {
-        this.editService.edit(modelURI, patchOrCommand).then(relay(res)).catch(handleError(res));
+        this.editService.edit(modelURI.toString(), patchOrCommand).then(relay(res)).catch(handleError(res));
     }
 
     /**
