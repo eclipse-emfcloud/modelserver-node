@@ -410,7 +410,6 @@ describe('DefaultModelService', () => {
             const model = await newModelService.create(modelContent);
             assumeThat(!!model, 'Model not created.');
 
-            // FIXME subscription is not triggered in listenForFullUpdate
             const { ready, done: closed } = listenForFullUpdate(client, newModelURI, 'close');
             await ready;
 
@@ -444,7 +443,6 @@ describe('DefaultModelService', () => {
                         }
                     }
                 };
-                // FIXME subscription is not triggered
                 client.subscribe(newModelURI.toString(), new NotificationSubscriptionListenerV2(listener));
             });
 
@@ -463,7 +461,6 @@ describe('DefaultModelService', () => {
             const model = await newModelService.create(modelContent);
             assumeThat(!!model, 'Model not created.');
 
-            // FIXME subscription is not triggered in listenForFullUpdate
             const { ready, done: deleted } = listenForFullUpdate(client, newModelURI, 'delete');
             await ready;
 
@@ -593,7 +590,6 @@ function listenForFullUpdate(
                 onOpen: () => resolveListening(true),
                 onClose: pass
             };
-            // FIXME subscription is not triggered
             client.subscribe(modelURI.toString(), listener);
         });
     });

@@ -42,7 +42,7 @@ async function loadModules(): Promise<ContainerModule[]> {
 function modelServerModule(modelServerPort: number): ContainerModule {
     return new ContainerModule(bind => {
         bind(UpstreamConnectionConfig).toConstantValue({
-            baseURL: 'api/v2/',
+            baseURL: 'api/v2',
             serverPort: modelServerPort,
             hostname: 'localhost'
         });
