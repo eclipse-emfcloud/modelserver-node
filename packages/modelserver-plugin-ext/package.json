@@ -30,10 +30,12 @@
     "express-ws": "^5.0.2",
     "fast-json-patch": "^3.1.0",
     "inversify": "^5.1.1",
+    "urijs": "^1.19.11",
     "winston": "^3.3.3"
   },
   "devDependencies": {
     "@types/reflect-metadata": "^0.1.0",
+    "@types/urijs": "^1.19.19",
     "@types/winston": "^2.4.4",
     "eslint-config-prettier": "^8.3.0",
     "reflect-metadata": "^0.1.13",
