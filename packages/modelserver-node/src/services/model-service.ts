@@ -20,6 +20,7 @@ import {
 import { EditTransaction, Logger, ModelService } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { EditService } from './edit-service';
@@ -35,7 +36,7 @@ export class DefaultModelService implements ModelService {
     protected readonly logger: Logger;
 
     @inject(MODEL_URI)
-    protected readonly modeluri: string;
+    protected readonly modeluri: URI;
 
     @inject(InternalModelServerClientApi)
     protected readonly client: InternalModelServerClientApi;
@@ -46,7 +47,7 @@ export class DefaultModelService implements ModelService {
     @inject(EditService)
     protected readonly editService: EditService;
 
-    getModelURI(): string {
+    getModelURI(): URI {
         return this.modeluri;
     }
 
@@ -55,40 +56,40 @@ export class DefaultModelService implements ModelService {
     getModel<M>(typeGuardOrFormat: TypeGuard<M> | string, format?: string): Promise<M | AnyObject> {
         if (typeof typeGuardOrFormat === 'string') {
             // It's the first signature with a format
-            return this.client.get(this.getModelURI(), typeGuardOrFormat);
+            return this.client.get(this.getModelURI().toString(), typeGuardOrFormat);
         }
         if (typeGuardOrFormat) {
             // It's the second signature and the format is easy to default
-            return this.client.get(this.getModelURI(), typeGuardOrFormat, format ?? FORMAT_JSON_V2);
+            return this.client.get(this.getModelURI().toString(), typeGuardOrFormat, format ?? FORMAT_JSON_V2);
         }
         // It's the first signature without a format
-        return this.client.get(this.getModelURI(), FORMAT_JSON_V2);
+        return this.client.get(this.getModelURI().toString(), FORMAT_JSON_V2);
     }
 
     edit(patch: Operation | Operation[]): Promise<ModelUpdateResult>;
     edit(command: ModelServerCommand): Promise<ModelUpdateResult>;
     edit(patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
-        return this.editService.edit(this.getModelURI(), patchOrCommand);
+        return this.editService.edit(this.getModelURI().toString(), patchOrCommand);
     }
 
     undo(): Promise<ModelUpdateResult> {
-        return this.client.undo(this.getModelURI());
+        return this.client.undo(this.getModelURI().toString());
     }
 
     redo(): Promise<ModelUpdateResult> {
-        return this.client.redo(this.getModelURI());
+        return this.client.redo(this.getModelURI().toString());
     }
 
     openTransaction(): Promise<EditTransaction> {
-        return this.client.openTransaction(this.getModelURI());
+        return this.client.openTransaction(this.getModelURI().toString());
     }
 
     validate(): Promise<Diagnostic> {
-        return this.validator.validate(this.getModelURI());
+        return this.validator.validate(this.getModelURI().toString());
     }
 
     async create<M extends AnyObject>(content: M, format?: string): Promise<M> {
-        return this.client.create(this.getModelURI(), content, format ?? FORMAT_JSON_V2).then(success => {
+        return this.client.create(this.getModelURI().toString(), content, format ?? FORMAT_JSON_V2).then(success => {
             if (success) {
                 return content;
             }
@@ -97,14 +98,14 @@ export class DefaultModelService implements ModelService {
     }
 
     save(): Promise<boolean> {
-        return this.client.save(this.getModelURI());
+        return this.client.save(this.getModelURI().toString());
     }
 
     close(): Promise<boolean> {
-        return this.client.close(this.getModelURI());
+        return this.client.close(this.getModelURI().toString());
     }
 
     delete(): Promise<boolean> {
-        return this.client.delete(this.getModelURI());
+        return this.client.delete(this.getModelURI().toString());
     }
 }

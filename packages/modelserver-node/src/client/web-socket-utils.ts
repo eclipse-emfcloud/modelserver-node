@@ -10,6 +10,7 @@
  *******************************************************************************/
 import { AnyObject, IdentityMapper, MessageDataMapper, ModelServerMessage, TypeGuard } from '@eclipse-emfcloud/modelserver-client';
 import { Request } from 'express';
+import * as URI from 'urijs';
 import { Logger } from 'winston';
 import * as WebSocket from 'ws';
 
@@ -38,7 +39,7 @@ export namespace WSUpgradeRequest {
 
     /** Change an `http:` URL to a `ws:` URL. */
     export function toWebsocketURL(httpURL: string): string {
-        return httpURL.replace(/^[^:]+/, 'ws');
+        return new URI(httpURL).protocol('ws').toString();
     }
 }
 

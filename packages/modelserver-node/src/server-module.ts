@@ -16,6 +16,7 @@ import {
     ModelServiceFactory
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { ContainerModule } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClient, InternalModelServerClientApi } from './client/model-server-client';
 import { CommandProviderRegistry } from './command-provider-registry';
@@ -41,7 +42,7 @@ export default new ContainerModule(bind => {
     bind(EditService).toSelf().inSingletonScope();
     bind(DefaultModelService).toSelf();
     bind(ModelService).toService(DefaultModelService);
-    bind(ModelServiceFactory).toFactory(context => (modeluri: string) => {
+    bind(ModelServiceFactory).toFactory(context => (modeluri: URI) => {
         const child = context.container.createChild();
         child.bind(MODEL_URI).toConstantValue(modeluri);
         return child.get(ModelService);

@@ -55,7 +55,7 @@ export namespace CoffeeMachine {
 /** A representation of the upstream _Model Server_, which may or may not be available to tests that need it. */
 class UpstreamServer {
     /** The upstream server's base URL. */
-    protected readonly baseURL = 'http://localhost:8081/api/v2/';
+    protected readonly baseURL = 'http://localhost:8081/api/v2';
 
     /**
      * Test whether the upstream server is available. If not, then call the `ifNot` call-back.
@@ -92,7 +92,7 @@ export class ServerFixture {
     protected server: ModelServer;
 
     constructor(protected readonly containerConfig?: (container: Container) => void) {
-        this.baseUrl = 'http://localhost:8082/api/v2/';
+        this.baseUrl = 'http://localhost:8082/api/v2';
         this.client = new ModelServerClientV2();
         this.client.initialize(this.baseUrl, 'json-v2');
 

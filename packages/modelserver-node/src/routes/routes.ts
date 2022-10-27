@@ -13,6 +13,33 @@ import { Response } from 'express';
 import { ServerResponse } from 'http';
 
 /**
+ * Return an uri related error response to the upstream client.
+ *
+ * @param res the upstream response stream
+ * @returns a function that takes an uri related error and reports it to the upstream client
+ */
+export function handleUriError(res: ServerResponse): (error: any) => void {
+    return error => respondUriError(res, error);
+}
+
+/**
+ * Return an uri related error response to the upstream client.
+ *
+ * @param res the upstream response stream
+ * @param error the uri related error to report
+ */
+export function respondUriError(res: ServerResponse, error: any): boolean {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    if (error.stack) {
+        res.write(JSON.stringify({ error: error.toString(), stackTrace: error.stack }));
+    } else {
+        res.write(JSON.stringify({ error: error.toString() }));
+    }
+    res.end();
+    return false;
+}
+
+/**
  * Return an error response to the upstream client.
  *
  * @param res the upstream response stream
