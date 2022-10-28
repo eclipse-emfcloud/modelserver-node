@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 import { Operation } from 'fast-json-patch';
+import * as URI from 'urijs';
 
 import { Transaction } from './executor';
 import { MaybePromise } from './util';
@@ -35,7 +36,7 @@ export interface TriggerProvider {
      * @param patch a JSON Patch describing model changes performed by a triggering edit
      * @returns whether the provider has any edits to add to the given `patch`
      */
-    canTrigger(modelURI: string, patch: Operation[]): boolean;
+    canTrigger(modelURI: URI, patch: Operation[]): boolean;
 
     /**
      * Obtain follow-up edits triggered by the given `patch`. These may either be
@@ -48,5 +49,5 @@ export interface TriggerProvider {
      *     or a transaction that should be run in the context of a transactional
      *     compound command {@link Executor}
      */
-    getTriggers(modelURI: string, modelDelta: Operation[]): MaybePromise<Operation[] | Transaction>;
+    getTriggers(modelURI: URI, modelDelta: Operation[]): MaybePromise<Operation[] | Transaction>;
 }

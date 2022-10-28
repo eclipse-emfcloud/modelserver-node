@@ -25,6 +25,7 @@ import { Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
+import * as URI from 'urijs';
 import * as WebSocket from 'ws';
 
 import { InternalModelServerClientApi, TransactionContext } from './client/model-server-client';
@@ -262,7 +263,7 @@ describe('Server Integration Tests', () => {
         });
 
         beforeEach(async () => {
-            transaction = await client.openTransaction('SuperBrewer3000.coffee');
+            transaction = await client.openTransaction(new URI('SuperBrewer3000.coffee'));
         });
 
         afterEach(async () => {
@@ -281,7 +282,7 @@ describe('Server Integration Tests', () => {
 
         it('transaction already open', async () => {
             try {
-                const duplicate = await client.openTransaction('SuperBrewer3000.coffee');
+                const duplicate = await client.openTransaction(new URI('SuperBrewer3000.coffee'));
                 await duplicate.rollback('Should not have been opened.');
                 expect.fail('Should not have been able to open duplicate transaction.');
             } catch (error) {
@@ -371,7 +372,7 @@ describe('Server Integration Tests', () => {
         it('Transaction rolled back by failure', async () => {
             const patch: Operation = { op: 'replace', path: '/workflows/0/name', value: 'New Name' };
 
-            const transaction1 = await client.openTransaction('SuperBrewer3000.coffee');
+            const transaction1 = await client.openTransaction(new URI('SuperBrewer3000.coffee'));
 
             try {
                 await transaction1.applyPatch(patch);
@@ -386,7 +387,7 @@ describe('Server Integration Tests', () => {
             expect(transaction1.isOpen()).to.be.false;
 
             // Should be able to open a new transaction
-            const transaction2 = await client.openTransaction('SuperBrewer3000.coffee');
+            const transaction2 = await client.openTransaction(new URI('SuperBrewer3000.coffee'));
             expect(transaction2.isOpen()).to.be.true;
 
             try {

@@ -20,6 +20,7 @@ import {
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { AddOperation, Operation, ReplaceOperation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 /**
  * A simple example of a plug-in that provides triggers for automatic update of model objects.
@@ -46,16 +47,16 @@ export class ExampleTriggerPlugin implements ModelServerPlugin {
 class IncrementDurationTriggerProvider implements TriggerProvider {
     constructor(protected readonly modelServerClient: ModelServerClientApi, protected readonly logger: Logger) {}
 
-    canTrigger(modelURI: string, patch: Operation[]): boolean {
+    canTrigger(modelURI: URI, patch: Operation[]): boolean {
         return patch.some(isDurationChange);
     }
 
-    async getTriggers(modelURI: string, modelDelta: Operation[]): Promise<Operation[]> {
+    async getTriggers(modelURI: URI, modelDelta: Operation[]): Promise<Operation[]> {
         // In this case, because the trigger updates the same properties previously modified,
         // we have all the information we need in the `modelDelta`. But in the general case,
         // a trigger provider will need to find other related objects in the model and generate
         // new changes from those, so that's how we do it here
-        const model = await this.modelServerClient.get(modelURI);
+        const model = await this.modelServerClient.get(modelURI.toString());
         const result: Operation[] = [];
 
         // Take only the last change to any given duration in case of multiple (such as
@@ -65,7 +66,7 @@ class IncrementDurationTriggerProvider implements TriggerProvider {
             // Don't update if already a multiple of ten
             if (element && op.value % 10 !== 0) {
                 this.logger.debug('Rounding up duration %d of object at %s', op.value, op.path);
-                result.push(replace(modelURI, element, 'duration', roundUp(op.value, 10)));
+                result.push(replace(modelURI.toString(), element, 'duration', roundUp(op.value, 10)));
             }
         });
 

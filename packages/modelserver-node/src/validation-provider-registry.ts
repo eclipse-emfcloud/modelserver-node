@@ -12,11 +12,12 @@
 import { Diagnostic, ModelServerObjectV2, OK } from '@eclipse-emfcloud/modelserver-client';
 import { Logger, ValidationProvider, ValidationProviderRegistrationOptions } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named } from 'inversify';
+import URI = require('urijs');
 import { v4 as uuid } from 'uuid';
 
 type ValidationProviderFilter = (model: ModelServerObjectV2, modelURI: string) => boolean;
 
-export type Validator = (model: ModelServerObjectV2, modelURI: string) => Promise<Diagnostic>;
+export type Validator = (model: ModelServerObjectV2, modelURI: URI) => Promise<Diagnostic>;
 
 /**
  * A registry of validation providers from _Model Server_ plug-ins.
@@ -75,17 +76,17 @@ export class ValidationProviderRegistry {
         return false;
     }
 
-    getProviders(model: ModelServerObjectV2, modelURI: string): ValidationProvider[] {
+    getProviders(model: ModelServerObjectV2, modelURI: URI): ValidationProvider[] {
         const result: ValidationProvider[] = [];
         this.providers.forEach(next => {
-            if (next.filter(model, modelURI)) {
+            if (next.filter(model, modelURI.toString())) {
                 result.push(next.provider);
             }
         });
         return result;
     }
 
-    getValidator(model: ModelServerObjectV2, modelURI: string): Validator | undefined {
+    getValidator(model: ModelServerObjectV2, modelURI: URI): Validator | undefined {
         this.logger.debug(`Looking up provider for validation of ${modelURI}`);
         const providers = this.getProviders(model, modelURI);
         switch (providers.length) {
@@ -105,7 +106,7 @@ export class ValidationProviderRegistry {
      * @param modelURI its resource URI
      * @returns the validation result
      */
-    async validate(model: ModelServerObjectV2, modelURI: string): Promise<Diagnostic> {
+    async validate(model: ModelServerObjectV2, modelURI: URI): Promise<Diagnostic> {
         const validator = this.getValidator(model, modelURI);
         return validator(model, modelURI);
     }
@@ -124,16 +125,16 @@ function createModelURIFilter(filter?: string | RegExp): (modelURI: string) => b
 }
 
 function multiValidator(providers: ValidationProvider[]): Validator {
-    return async (model: ModelServerObjectV2, modelURI: string) => {
+    return async (model: ModelServerObjectV2, modelURI: URI) => {
         const diagnostics = await Promise.all(providers.map(v => v.validate(model, modelURI)));
         return summarize(model, modelURI, diagnostics);
     };
 }
 
-function summarize(model: ModelServerObjectV2, modelURI: string, diagnostics: Diagnostic[]): Diagnostic {
+function summarize(model: ModelServerObjectV2, modelURI: URI, diagnostics: Diagnostic[]): Diagnostic {
     const result = Diagnostic.merge(...diagnostics);
     if (result.severity > OK) {
-        result.message = `Diagnosis of ${modelURI}`;
+        result.message = `Diagnosis of ${modelURI.toString()}`;
         result.id = '/';
     }
     return result;

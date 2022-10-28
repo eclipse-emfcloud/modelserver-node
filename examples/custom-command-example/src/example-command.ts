@@ -20,6 +20,7 @@ import {
     Transaction
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 /**
  * A simple example of a plug-in that provides custom commands.
@@ -52,7 +53,7 @@ class IncrementDurationCommandProvider implements CommandProvider {
         return true; // The command type filter is all I need
     }
 
-    getCommands(_modelUri: string, customCommand: ModelServerCommand): Transaction {
+    getCommands(_modelUri: URI, customCommand: ModelServerCommand): Transaction {
         const [modelURI, elementID] = customCommand.owner.$ref.split('#');
 
         return async executor => {

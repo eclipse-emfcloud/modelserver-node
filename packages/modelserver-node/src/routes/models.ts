@@ -105,7 +105,7 @@ export class ModelsRoutes implements RouteProvider {
                 ? this.modelServerClient.create(modeluri.toString(), model, format)
                 : this.modelServerClient.update(modeluri.toString(), model, format);
 
-            delegated.then(this.performModelValidation(modeluri.toString())).then(relay(res)).catch(handleError(res));
+            delegated.then(this.performModelValidation(modeluri)).then(relay(res)).catch(handleError(res));
         };
     }
 
@@ -146,7 +146,7 @@ export class ModelsRoutes implements RouteProvider {
         patchOrCommand: Operation | Operation[] | ModelServerCommand,
         res: Response<any, Record<string, any>>
     ): void {
-        this.editService.edit(modelURI.toString(), patchOrCommand).then(relay(res)).catch(handleError(res));
+        this.editService.edit(modelURI, patchOrCommand).then(relay(res)).catch(handleError(res));
     }
 
     /**
@@ -155,7 +155,7 @@ export class ModelsRoutes implements RouteProvider {
      * @param modelURI the model created or replaced
      * @returns the created or replacing model
      */
-    protected performModelValidation(modelURI: string): (delegatedResult: AnyObject) => Promise<AnyObject> {
+    protected performModelValidation(modelURI: URI): (delegatedResult: AnyObject) => Promise<AnyObject> {
         const validator = this.validationManager;
 
         return async (delegatedResult: AnyObject) => validator.performLiveValidation(modelURI).then(() => delegatedResult);

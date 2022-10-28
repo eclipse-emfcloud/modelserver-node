@@ -93,7 +93,7 @@ export class CommandProviderRegistry {
      * @returns the provided command, command transaction, or the original `customCommand` standing in for itself
      *    if no provider can handle the custom command
      */
-    async getCommands(modelUri: string, customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
+    async getCommands(modelUri: URI, customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
         let result: ModelServerCommand | Operation[] | Transaction | undefined;
         const provider = this.getProvider(customCommand);
         if (provider) {

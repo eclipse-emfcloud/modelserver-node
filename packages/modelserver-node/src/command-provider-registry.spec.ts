@@ -12,6 +12,7 @@ import { ModelServerCommand, replace } from '@eclipse-emfcloud/modelserver-clien
 import { CommandProvider, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { expect } from 'chai';
 import { Container } from 'inversify';
+import * as URI from 'urijs';
 
 import { CommandProviderRegistry } from './command-provider-registry';
 
@@ -52,7 +53,7 @@ class TestCommandProvider implements CommandProvider {
         return true;
     }
 
-    getCommands(_modelUri: string, customCommand: ModelServerCommand): Transaction {
+    getCommands(_modelUri: URI, customCommand: ModelServerCommand): Transaction {
         if (!customCommand.owner) {
             console.error('custom command owner was unexpectedly undefined');
             return async () => false;

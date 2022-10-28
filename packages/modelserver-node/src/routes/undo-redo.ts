@@ -12,6 +12,7 @@ import { ModelUpdateResult } from '@eclipse-emfcloud/modelserver-client/lib';
 import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { ValidationManager } from '../services/validation-manager';
@@ -69,11 +70,14 @@ export class UndoRedoRoutes implements RouteProvider {
                 ? this.modelServerClient.undo(modelURI)
                 : this.modelServerClient.redo(modelURI);
 
-            delegated.then(this.performLiveValidation(modelURI)).then(relay(res)).catch(handleError(res));
+            delegated
+                .then(this.performLiveValidation(new URI(modelURI)))
+                .then(relay(res))
+                .catch(handleError(res));
         };
     }
 
-    protected performLiveValidation(modelURI: string): (delegatedResult: ModelUpdateResult) => Promise<ModelUpdateResult> {
+    protected performLiveValidation(modelURI: URI): (delegatedResult: ModelUpdateResult) => Promise<ModelUpdateResult> {
         const validator = this.validationManager;
 
         return async (delegatedResult: ModelUpdateResult) => validator.performLiveValidation(modelURI).then(() => delegatedResult);

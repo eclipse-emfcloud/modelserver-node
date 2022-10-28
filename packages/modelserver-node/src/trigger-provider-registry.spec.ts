@@ -15,6 +15,7 @@ import { expect } from 'chai';
 import { Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
 import * as sinon from 'sinon';
+import * as URI from 'urijs';
 
 import { TriggerProviderRegistry } from './trigger-provider-registry';
 
@@ -53,11 +54,11 @@ describe('TriggerProviderRegistry', () => {
 
     describe('provider aggregation in #getProvider', () => {
         const provider1 = {
-            canTrigger: (modelURI: string) => modelURI === 'test:a',
+            canTrigger: (modelURI: URI) => modelURI.equals('test:a'),
             getTriggers: (): Operation[] => [{ op: 'replace', path: '/foo/bar/name', value: 'Provider 1' }]
         };
         const provider2 = {
-            canTrigger: (modelURI: string) => modelURI.startsWith('test:'),
+            canTrigger: (modelURI: URI) => modelURI.protocol() === 'test',
             getTriggers: (): Operation[] => [{ op: 'remove', path: '/foo/bar/things/2' }]
         };
 
@@ -69,25 +70,25 @@ describe('TriggerProviderRegistry', () => {
         afterEach(() => registrations());
 
         it('no provider matches', () => {
-            const provider = registry.getProvider('none:a', [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
+            const provider = registry.getProvider(new URI('none:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(provider).to.be.undefined;
         });
 
         it('one provider matches', () => {
-            const provider = registry.getProvider('test:b', [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
+            const provider = registry.getProvider(new URI('test:b'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(provider).to.be.equal(provider2);
         });
 
         it('multiple providers match', async () => {
-            const provider = registry.getProvider('test:a', [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
+            const provider = registry.getProvider(new URI('test:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(provider).to.exist;
-            const trigger = await provider.getTriggers('test:a', [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
+            const trigger = await provider.getTriggers(new URI('test:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(trigger).to.be.a('function');
 
             const transaction = trigger as Transaction;
             const counter = new AsyncCounter();
             const executor = sinon.spy({
-                execute: async (modelUri: string, command: ModelServerCommand) => counter.tick({ success: true }),
+                execute: async (modelUri: URI, command: ModelServerCommand) => counter.tick({ success: true }),
                 applyPatch: async (patch: Operation | Operation[]) => counter.tick({ success: true })
             });
 

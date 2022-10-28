@@ -12,6 +12,7 @@
 import { Executor, Logger, Transaction, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 import { v4 as uuid } from 'uuid';
 
 /**
@@ -62,7 +63,7 @@ export class TriggerProviderRegistry {
         return this.providers.size > 0;
     }
 
-    getProviders(modelURI: string, patch: Operation[]): TriggerProvider[] {
+    getProviders(modelURI: URI, patch: Operation[]): TriggerProvider[] {
         this.logger.debug('Looking up trigger providers for JSON Patch');
         const result: TriggerProvider[] = [];
         for (const provider of this.providers.values()) {
@@ -81,7 +82,7 @@ export class TriggerProviderRegistry {
      * @returns an aggregate trigger provider, or `undefined` if no registered providers
      *    respond to the `patch`
      */
-    getProvider(modelURI: string, patch: Operation[]): TriggerProvider | undefined {
+    getProvider(modelURI: URI, patch: Operation[]): TriggerProvider | undefined {
         const providers = this.getProviders(modelURI, patch);
         switch (providers.length) {
             case 0:
@@ -100,7 +101,7 @@ export class TriggerProviderRegistry {
      * @param patch the JSON Patch on which to trigger further changes
      * @returns the provided trigger patch or transaction, if any
      */
-    async getTriggers(modelURI: string, patch: Operation[]): Promise<Operation[] | Transaction | undefined> {
+    async getTriggers(modelURI: URI, patch: Operation[]): Promise<Operation[] | Transaction | undefined> {
         let result: Operation[] | Transaction | undefined;
         const provider = this.getProvider(modelURI, patch);
         if (provider) {
@@ -124,7 +125,7 @@ export class TriggerProviderRegistry {
 function multiTriggerProvider(triggerProviders: TriggerProvider[]): TriggerProvider {
     return {
         canTrigger: () => true,
-        getTriggers: (modelURI: string, modelDelta: Operation[]) => async (executor: Executor) => {
+        getTriggers: (modelURI: URI, modelDelta: Operation[]) => async (executor: Executor) => {
             let result = true;
 
             for (const provider of triggerProviders) {
