@@ -10,9 +10,9 @@
  *******************************************************************************/
 
 import { Diagnostic, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
+import * as URI from 'urijs';
 
 import { MaybePromise } from './util';
-
 /**
  * Protocol for a provider of custom validation rules that may be registered by a _Model Server_ plug-in.
  */

@@ -12,7 +12,7 @@
 import { Diagnostic, ModelServerObjectV2, OK } from '@eclipse-emfcloud/modelserver-client';
 import { Logger, ValidationProvider, ValidationProviderRegistrationOptions } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named } from 'inversify';
-import URI = require('urijs');
+import * as URI from 'urijs';
 import { v4 as uuid } from 'uuid';
 
 type ValidationProviderFilter = (model: ModelServerObjectV2, modelURI: string) => boolean;

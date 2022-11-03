@@ -11,7 +11,7 @@
 import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { inject, injectable, named } from 'inversify';
-import URI = require('urijs');
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { ValidationManager } from '../services/validation-manager';

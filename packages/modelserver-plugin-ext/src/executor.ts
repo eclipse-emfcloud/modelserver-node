@@ -11,6 +11,7 @@
 
 import { ModelServerCommand, ModelUpdateResult } from '@eclipse-emfcloud/modelserver-client';
 import { Operation } from 'fast-json-patch';
+import * as URI from 'urijs';
 
 /**
  * Protocol of a context in which commands may be executed and JSON patches applied.

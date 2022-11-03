@@ -11,11 +11,10 @@
 import { Diagnostic, encode, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
 import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named, postConstruct } from 'inversify';
-
-import { validateModelURI } from '../client/uri-utils';
-import URI = require('urijs');
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
+import { validateModelURI } from '../client/uri-utils';
 import { JSONSocket } from '../client/web-socket-utils';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
 import { SubscriptionManager } from './subscription-manager';

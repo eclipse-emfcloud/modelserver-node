@@ -13,6 +13,7 @@ import { AddCommand, ModelServerCommand, RemoveCommand, SetCommand } from '@ecli
 import { CommandProvider, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 /**
  * A registry of command providers from _Model Server_ plug-ins.
