@@ -12,7 +12,7 @@ import { expect } from 'chai';
 
 import { CompletablePromise } from './promise-utils';
 
-describe('Deferred', () => {
+describe('CompletablePromise', () => {
     it('#resolve', async () => {
         const promise = CompletablePromise.newPromise<string>();
 
