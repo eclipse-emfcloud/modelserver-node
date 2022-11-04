@@ -8,30 +8,21 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { ModelServerClientV2, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
-import {
-    EditTransaction,
-    MiddlewareProvider,
-    RouteProvider,
-    RouterFactory,
-    TriggerProvider
-} from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import * as chai from 'chai';
 import { expect } from 'chai';
 import * as chaiLike from 'chai-like';
-import { IRoute, IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
 import { Operation } from 'fast-json-patch';
-import { Container } from 'inversify';
-import * as sinon from 'sinon';
 import { assert } from 'sinon';
 import * as URI from 'urijs';
 import * as WebSocket from 'ws';
 
-import { InternalModelServerClientApi, TransactionContext } from './client/model-server-client';
-import { createContainer } from './di';
-import { ModelServer } from './server';
-import { TriggerProviderRegistry } from './trigger-provider-registry';
+import { InternalModelServerClientApi, TransactionContext } from '../client/model-server-client';
+import { createContainer } from '../di';
+import { TriggerProviderRegistry } from '../trigger-provider-registry';
+import { awaitClosed, captureMessage, MockMiddleware, provideEndpoint, provideMiddleware, route } from './test-helpers';
+import { isCoffeeMachine } from './test-model-helper';
+import { ServerFixture } from './test-server-fixture';
 
 /**
  * Integration tests for the server.
@@ -39,105 +30,8 @@ import { TriggerProviderRegistry } from './trigger-provider-registry';
  * These require the Example Coffee Model server from the `eclipse-emfcloud/emfcloud-modelserver` project to be
  * running as the upstream Java server, listening on port 8081
  */
-export const integrationTests = undefined;
 
 chai.use(chaiLike);
-
-export type MockMiddleware = sinon.SinonSpy<[req: Request, res: Response, next: NextFunction], any>;
-
-export interface CoffeeMachine extends ModelServerObjectV2 {
-    name?: string;
-}
-
-export namespace CoffeeMachine {
-    export const TYPE = 'http://www.eclipsesource.com/modelserver/example/coffeemodel#//Machine';
-}
-
-/** A representation of the upstream _Model Server_, which may or may not be available to tests that need it. */
-class UpstreamServer {
-    /** The upstream server's base URL. */
-    protected readonly baseURL = 'http://localhost:8081/api/v2';
-
-    /**
-     * Test whether the upstream server is available. If not, then call the `ifNot` call-back.
-     * The result of the test is cached for future invocations.
-     *
-     * @param ifNot a call-back to invoke in the case that the upstream server is not available
-     */
-    async testAvailable(ifNot: () => void): Promise<void> {
-        const upstream = new ModelServerClientV2();
-        upstream.initialize(this.baseURL);
-
-        return upstream
-            .ping()
-            .then(() => {
-                this.testAvailable = () => Promise.resolve();
-            })
-            .catch(() => {
-                console.log('*** Upstream Java server is not running. Please launch it on port 8081 before running tests.');
-                ifNot();
-                this.testAvailable = (_ifNot: () => void) => {
-                    _ifNot();
-                    return Promise.reject();
-                };
-            });
-    }
-}
-
-/** Test fixture wrapping an Inversify-configured _Model Server_ that is started up and stopped for each test case. */
-export class ServerFixture {
-    static upstream = new UpstreamServer();
-
-    readonly baseUrl: string;
-    readonly client: ModelServerClientV2;
-    protected server: ModelServer;
-
-    constructor(protected readonly containerConfig?: (container: Container) => void) {
-        this.baseUrl = 'http://localhost:8082/api/v2';
-        this.client = new ModelServerClientV2();
-        this.client.initialize(this.baseUrl, 'json-v2');
-
-        beforeEach(this.setup.bind(this));
-        afterEach(this.tearDown.bind(this));
-    }
-
-    /**
-     * Declare that the test suite requires an upstream _Model Server_ to be running, listening on port 8081.
-     */
-    requireUpstreamServer(): void {
-        before(function (done) {
-            ServerFixture.upstream.testAvailable(this.skip.bind(this)).finally(done);
-        });
-    }
-
-    setup(done: Mocha.Done): void {
-        createContainer(8081, 'error')
-            .then(container => {
-                if (this.containerConfig) {
-                    this.containerConfig(container);
-                }
-
-                this.server = container.get(ModelServer);
-                return this.server.serve(8082, 8081);
-            })
-            .then(() => done());
-    }
-
-    tearDown(done: Mocha.Done): void {
-        if (!this.server) {
-            // Nothing to stop
-            done();
-        } else {
-            // Don't return a promise
-            this.server.stop().finally(done);
-        }
-    }
-
-    get(path: string, config?: AxiosRequestConfig): Promise<AxiosResponse> {
-        const rest = this.client['restClient'];
-        return rest.get(path, config);
-    }
-}
 
 describe('Server Integration Tests', () => {
     describe('Requests simply forwarded to upstream', () => {
@@ -401,113 +295,3 @@ describe('Server Integration Tests', () => {
         });
     });
 });
-
-export function isCoffeeMachine(obj: unknown): obj is CoffeeMachine {
-    return ModelServerObjectV2.is(obj) && obj.$type === CoffeeMachine.TYPE;
-}
-
-/**
- * Create an _Express_ middleware that simply passes to the next middleware, which is spied upon by Sinon
- * to allow assertions about interactions with it, and inject it into the server.
- *
- * @param container the Inversify container
- * @param forRoute the specific route for which to provide the middleware, or omitted to provide the middleware on all routes
- * @returns a mock middleware for Sinon spy assertions
- */
-export function provideMiddleware(container: Container, forRoute?: string): MockMiddleware {
-    const result: MockMiddleware = sinon.spy((req, res, next) => next());
-    const middlewareProvider: MiddlewareProvider = {
-        getMiddlewares(router: IRouter, aRoute: string) {
-            return aRoute === forRoute ? [result] : [];
-        }
-    };
-
-    container.bind(MiddlewareProvider).toConstantValue(middlewareProvider);
-    return result;
-}
-
-export type SupportedMethod = keyof Pick<IRoute, 'get' | 'put' | 'post' | 'patch' | 'delete'>;
-export interface CustomRoute {
-    method: SupportedMethod;
-    path: string;
-    handler: RequestHandler;
-}
-
-export function route(method: SupportedMethod, handler: RequestHandler): CustomRoute;
-export function route(method: SupportedMethod, path: string, handler: RequestHandler): CustomRoute;
-export function route(method: SupportedMethod, path?: string | RequestHandler, handler?: RequestHandler): CustomRoute {
-    if (typeof path === 'function') {
-        handler = path;
-        path = '/';
-    } else if (typeof path === 'undefined') {
-        handler = (req, res, next) => next();
-        path = '/';
-    } else if (!handler) {
-        handler = (req, res, next) => next();
-    }
-
-    return { method, path, handler };
-}
-
-export function provideEndpoint(container: Container, basePath: string, ...routes: CustomRoute[]): void {
-    const provider: RouteProvider = {
-        configureRoutes(routerFactory: RouterFactory) {
-            const router = routerFactory(basePath);
-            routes.forEach(aRoute => router[aRoute.method](aRoute.path, aRoute.handler));
-        }
-    };
-    container.bind(RouteProvider).toConstantValue(provider);
-}
-
-export interface SocketTimeout {
-    clear(): void;
-}
-
-export function socketTimeout(ws: WebSocket, reject: (reason?: any) => void): SocketTimeout {
-    const result = setTimeout(() => {
-        ws.close();
-        reject(new Error('timeout'));
-    }, 1000);
-
-    return {
-        clear: () => {
-            ws.close();
-            clearTimeout(result);
-        }
-    };
-}
-
-export function captureMessage(ws: WebSocket, filter?: (msg: WebSocket.MessageEvent) => boolean): Promise<WebSocket.MessageEvent> {
-    let timeout: SocketTimeout;
-
-    return new Promise<WebSocket.MessageEvent>((resolve, reject) => {
-        ws.onmessage = msg => {
-            if (!filter || filter(msg)) {
-                resolve(msg);
-            }
-        };
-        timeout = socketTimeout(ws, reject);
-    }).then(result => {
-        timeout.clear();
-        return result;
-    });
-}
-
-export function awaitClosed(transaction: EditTransaction): Promise<boolean> {
-    let timeout: SocketTimeout;
-
-    return new Promise(resolve => {
-        const check = setInterval(() => {
-            if (!transaction.isOpen()) {
-                clearInterval(check);
-                timeout.clear();
-                resolve(true);
-            }
-        }, 50);
-
-        timeout = socketTimeout(transaction['socket'], reason => {
-            clearInterval(check);
-            resolve(false);
-        });
-    });
-}

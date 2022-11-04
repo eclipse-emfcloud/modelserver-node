@@ -5,6 +5,6 @@
   "color": true,
   "watch-files": ["*.ts", "*.tsx"],
   "timeout": 0,
-  "spec": ["**/src/**/*.spec.ts"],
-  "ignore": ["**/src/**/server-integration-test.spec.ts"]
+  "spec": ["**/test/*.spec.ts"],
+  "ignore": ["**/test/*-integration-test.spec.ts"]
 }

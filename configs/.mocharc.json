@@ -5,5 +5,5 @@
   "color": true,
   "watch-files": ["*.ts", "*.tsx"],
   "timeout": 2000,
-  "spec": ["**/src/**/*.spec.ts"]
+  "spec": ["**/test/*.spec.ts"]
 }

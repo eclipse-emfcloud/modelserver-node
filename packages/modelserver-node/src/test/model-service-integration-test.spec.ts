@@ -10,35 +10,33 @@
  *******************************************************************************/
 import {
     CompoundCommand,
-    Diagnostic,
-    ModelServerCommand,
     ModelServerNotificationListenerV2,
     ModelServerObjectV2,
     NotificationSubscriptionListenerV2,
-    Operations,
-    SetCommand,
-    SubscriptionListener,
     WARNING
 } from '@eclipse-emfcloud/modelserver-client';
-import {
-    CommandProvider,
-    ModelServerClientApi,
-    ModelService,
-    ModelServiceFactory,
-    TriggerProvider
-} from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { ModelServerClientApi, ModelService, ModelServiceFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import * as chai from 'chai';
 import { expect } from 'chai';
 import * as chaiLike from 'chai-like';
 import { getValueByPointer, Operation } from 'fast-json-patch';
 import { Container } from 'inversify';
-import { Context } from 'mocha';
 import * as URI from 'urijs';
 
 import { CommandProviderRegistry } from '../command-provider-registry';
-import { awaitClosed, CoffeeMachine, isCoffeeMachine, ServerFixture } from '../server-integration-test.spec';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
+import {
+    _assumeThat,
+    awaitClosed,
+    findDiagnostic,
+    listenForFullUpdate,
+    registerCommand,
+    registerTrigger,
+    requireArray
+} from './test-helpers';
+import { CoffeeMachine, isCoffeeMachine } from './test-model-helper';
+import { ServerFixture } from './test-server-fixture';
 
 /**
  * Integration tests for the `ModelService` API.
@@ -46,7 +44,6 @@ import { ValidationProviderRegistry } from '../validation-provider-registry';
  * These require the Example Coffee Model server from the `eclipse-emfcloud/emfcloud-modelserver` project to be
  * running as the upstream Java server, listening on port 8081.
  */
-export const integrationTests = undefined;
 
 chai.use(chaiLike);
 
@@ -253,7 +250,7 @@ describe('DefaultModelService', () => {
 
         const transaction = await modelService.openTransaction();
         expect(transaction.isOpen()).to.be.true;
-        expect(transaction.getModelURI()).to.be.string(modelURI.toString());
+        expect(transaction.getModelURI().toString()).to.be.string(modelURI.toString());
 
         const result = await transaction.edit(patch);
         expect(result.success).to.be.true;
@@ -373,8 +370,8 @@ describe('DefaultModelService', () => {
         expect(actual).to.be.string('Simple Workflow');
     });
 
-    describe.only('Destructive APIs', () => {
-        let newModelURI;
+    describe('Destructive APIs', () => {
+        let newModelURI: URI;
         const modelContent: Partial<CoffeeMachine> = {
             $type: CoffeeMachine.TYPE,
             name: 'New Coffee Machine'
@@ -476,122 +473,3 @@ describe('DefaultModelService', () => {
         });
     });
 });
-
-function requireArray(owner: object, propertyName: string): unknown[] {
-    expect(owner[propertyName]).to.be.an('array').that.is.not.empty;
-    return owner[propertyName] as unknown[];
-}
-
-function _assumeThat(this: Context, condition: boolean, reason: string): void {
-    if (!condition) {
-        if (this.test) {
-            this.test.title = `${this.test.title} - skipped: ${reason}`;
-        }
-        this.skip();
-    }
-}
-
-function findDiagnostic(diagnostic: Diagnostic, source: string): Diagnostic | undefined {
-    if (diagnostic.source === source) {
-        return diagnostic;
-    }
-
-    for (const child of diagnostic.children) {
-        const result = findDiagnostic(child, source);
-        if (result) {
-            return result;
-        }
-    }
-
-    return undefined;
-}
-
-/**
- * Register a test trigger.
- *
- * @param triggerRegistry the trigger registry
- * @returns a function that unregisters the test trigger
- */
-function registerTrigger(triggerRegistry: TriggerProviderRegistry): () => void {
-    const endsWithNumber = (s: string): boolean => /\d+$/.test(s);
-
-    const triggerProvider: TriggerProvider = {
-        canTrigger: () => true,
-        getTriggers: (_modelURI, modelDelta) => {
-            if (modelDelta.length === 1 && Operations.isReplace(modelDelta[0], 'string') && !endsWithNumber(modelDelta[0].value)) {
-                return [
-                    {
-                        op: 'replace',
-                        path: modelDelta[0].path,
-                        value: `${modelDelta[0].value} 1`
-                    }
-                ];
-            }
-            return [];
-        }
-    };
-
-    const id = triggerRegistry.register(triggerProvider);
-
-    return () => triggerRegistry.unregister(id, triggerProvider);
-}
-
-/**
- * Register a test command.
- *
- * @param commandRegistry the command registry
- * @returns a function that unregisters the test command
- */
-function registerCommand(commandRegistry: CommandProviderRegistry): () => void {
-    const provider: CommandProvider = {
-        canHandle: () => true,
-        getCommands: (_modelUri, customCommand: ModelServerCommand) =>
-            new SetCommand(customCommand.owner!, 'name', [customCommand.getProperty('newName') as string])
-    };
-    commandRegistry.register('test-set-name', provider);
-
-    return () => commandRegistry.unregister('test-set-name', provider);
-}
-
-/**
- * Listen for the full-update message that signals either close or deletion of a model,
- * according to the requested `mode`.
- *
- * @param client the model server client on which to add a subscription listener
- * @param modelURI the model on which to add a subscription listener
- * @param mode the wait mode
- * @returns a promise to await to synchronize with listener attachment and another to
- *          await to synchronize with receipt of the matching full-update message
- */
-function listenForFullUpdate(
-    client: ModelServerClientApi,
-    modelURI: URI,
-    mode: 'close' | 'delete'
-): { ready: Promise<boolean>; done: Promise<boolean> } {
-    let result: Promise<boolean>;
-    const listening = new Promise<boolean>(resolveListening => {
-        result = new Promise<boolean>(resolveResult => {
-            // Cannot use the NotificationSubscriptionListenerV2 API to listen for model
-            // close or delete because it throws an error on attempt to map the null model
-            // int the full-update message that signals close/delete
-            const listener: SubscriptionListener = {
-                onError: (uri, event) => {
-                    expect.fail(`Error in ${uri} subscription: ${event.error}`);
-                },
-                onMessage: (_uri, event) => {
-                    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                    // Close doesn't, in practice, yield a `null` update because the model controller
-                    // immediately re-loads the resource from storage.
-                    // eslint-disable-next-line no-null/no-null
-                    if (data.type === 'fullUpdate' && (mode === 'close' || data.data == null)) {
-                        resolveResult(true);
-                    }
-                },
-                onOpen: () => resolveListening(true),
-                onClose: pass
-            };
-            client.subscribe(modelURI.toString(), listener);
-        });
-    });
-    return { ready: listening, done: result! };
-}
