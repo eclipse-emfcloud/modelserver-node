@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/mocharc",
+  "require": ["ts-node/register", "reflect-metadata/Reflect", "ignore-styles"],
+  "reporter": "spec",
+  "color": true,
+  "watch-files": ["*.ts", "*.tsx"],
+  "timeout": 0,
+  "extension": ["spec.ts"]
+}
