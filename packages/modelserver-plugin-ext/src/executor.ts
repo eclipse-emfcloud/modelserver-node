@@ -11,6 +11,7 @@
 
 import { ModelServerCommand, ModelUpdateResult } from '@eclipse-emfcloud/modelserver-client';
 import { Operation } from 'fast-json-patch';
+import * as URI from 'urijs';
 
 /**
  * Protocol of a context in which commands may be executed and JSON patches applied.
@@ -27,7 +28,7 @@ export interface Executor {
      * @param command a command to be executed on the model
      * @return the result of the command's execution
      */
-    execute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult>;
+    execute(modelUri: URI, command: ModelServerCommand): Promise<ModelUpdateResult>;
 
     /**
      * Apply a JSON patch to the model.

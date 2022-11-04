@@ -12,6 +12,7 @@ import { AddCommand, ModelServerCommand, ModelUpdateResult, RemoveCommand, SetCo
 import { Executor, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi, isModelServerCommand, TransactionContext } from '../client/model-server-client';
 import { CommandProviderRegistry } from '../command-provider-registry';
@@ -39,7 +40,7 @@ export class EditService {
     @inject(ValidationManager)
     protected readonly validationManager: ValidationManager;
 
-    async edit(modelURI: string, patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
+    async edit(modelURI: URI, patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
         if (isModelServerCommand(patchOrCommand)) {
             // Case of executing a command
             const command = patchOrCommand;
@@ -51,7 +52,7 @@ export class EditService {
         return this.forwardEdit(modelURI, patch);
     }
 
-    protected async handleCommand(modelURI: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
+    protected async handleCommand(modelURI: URI, command: ModelServerCommand): Promise<ModelUpdateResult> {
         this.logger.debug(`Getting commands provided for ${command.type}`);
 
         const provided = await this.commandProviderRegistry.getCommands(modelURI, command);
@@ -59,7 +60,7 @@ export class EditService {
     }
 
     protected forwardEdit(
-        modelURI: string,
+        modelURI: URI,
         providedEdit: ModelServerCommand | Operation | Operation[] | Transaction
     ): Promise<ModelUpdateResult> {
         if (this.triggerProviderRegistry.hasProviders()) {
@@ -69,7 +70,7 @@ export class EditService {
     }
 
     private async forwardEditSimple(
-        modelURI: string,
+        modelURI: URI,
         providedEdit: ModelServerCommand | Operation | Operation[] | Transaction
     ): Promise<ModelUpdateResult> {
         if (typeof providedEdit === 'function') {
@@ -86,10 +87,10 @@ export class EditService {
 
             if (isModelServerCommand(providedEdit)) {
                 // Command case
-                result = this.modelServerClient.edit(modelURI, providedEdit);
+                result = this.modelServerClient.edit(modelURI.toString(), providedEdit);
             } else {
                 // JSON Patch case
-                result = this.modelServerClient.edit(modelURI, providedEdit);
+                result = this.modelServerClient.edit(modelURI.toString(), providedEdit);
             }
 
             return result.then(this.performPatchValidation(modelURI));
@@ -97,7 +98,7 @@ export class EditService {
     }
 
     private async forwardEditWithTriggers(
-        modelURI: string,
+        modelURI: URI,
         providedEdit: ModelServerCommand | Operation | Operation[] | Transaction
     ): Promise<ModelUpdateResult> {
         let result = true;
@@ -135,7 +136,7 @@ export class EditService {
      * @param modelURI the model patched
      * @returns a function that performs live validation on a model update result if it was successful
      */
-    protected performPatchValidation(modelURI: string): (validate: ModelUpdateResult) => Promise<ModelUpdateResult> {
+    protected performPatchValidation(modelURI: URI): (validate: ModelUpdateResult) => Promise<ModelUpdateResult> {
         const validator = this.validationManager;
 
         return async (validate: ModelUpdateResult) => {

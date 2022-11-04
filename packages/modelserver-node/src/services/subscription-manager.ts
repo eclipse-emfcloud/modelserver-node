@@ -14,6 +14,7 @@ import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { EventEmitter } from 'events';
 import { inject, injectable, named } from 'inversify';
 import { stringify as unparseQuery } from 'qs';
+import * as URI from 'urijs';
 import * as WebSocket from 'ws';
 
 import { UpstreamConnectionConfig } from '../client/model-server-client';
@@ -129,9 +130,9 @@ export class SubscriptionManager {
      * @param filter an optional subscriber filter, by options property or a generic predicate
      * @returns the matching subscriber sockets
      */
-    protected getSubscribers(modelURI: string, filter?: keyof SubscriptionQuery | ((options: SubscriptionQuery) => boolean)): JSONSocket[] {
+    protected getSubscribers(modelURI: URI, filter?: keyof SubscriptionQuery | ((options: SubscriptionQuery) => boolean)): JSONSocket[] {
         return Array.from(this.subscriptions.keys())
-            .filter(client => client.options.modeluri === modelURI)
+            .filter(client => modelURI.equals(client.options.modeluri))
             .filter(subscriberFilter(filter));
     }
 
@@ -145,21 +146,21 @@ export class SubscriptionManager {
      * @param filter an optional subscriber filter, by options property or a generic predicate
      * @returns whether any matching subscriptions exist
      */
-    protected hasSubscribers(modelURI: string, filter?: keyof SubscriptionQuery | ((options: SubscriptionQuery) => boolean)): boolean {
+    protected hasSubscribers(modelURI: URI, filter?: keyof SubscriptionQuery | ((options: SubscriptionQuery) => boolean)): boolean {
         return Array.from(this.subscriptions.keys())
-            .filter(client => client.options.modeluri === modelURI)
+            .filter(client => modelURI.equals(client.options.modeluri))
             .some(subscriberFilter(filter));
     }
 
-    hasValidationSubscribers(modelURI: string): boolean {
+    hasValidationSubscribers(modelURI: URI): boolean {
         return this.hasSubscribers(modelURI, 'livevalidation');
     }
 
-    protected getValidationSubscribers(modelURI: string): JSONSocket[] {
+    protected getValidationSubscribers(modelURI: URI): JSONSocket[] {
         return this.getSubscribers(modelURI, 'livevalidation');
     }
 
-    async broadcastValidation(modelURI: string, results: Diagnostic): Promise<boolean> {
+    async broadcastValidation(modelURI: URI, results: Diagnostic): Promise<boolean> {
         const message = {
             type: MessageType.validationResult,
             data: results

@@ -159,7 +159,7 @@ export interface EditTransaction {
     /**
      * Query the URI of the model that this transaction edits.
      */
-    getModelURI(): string;
+    getModelURI(): URI;
 
     /**
      * Query whether the transaction is currently open.

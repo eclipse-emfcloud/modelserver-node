@@ -38,7 +38,6 @@ import * as WebSocket from 'ws';
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { CompletablePromise } from './promise-utils';
-import { validateModelURI } from './uri-utils';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -71,7 +70,7 @@ export interface InternalModelServerClientApi extends ModelServerClientApi {
      * @returns a transactional context in which to execute a chained sequence of commands,
      *     or a rejected promise in the case that a transaction is already open on the given model
      */
-    openTransaction(modeluri: string): Promise<TransactionContext>;
+    openTransaction(modeluri: URI): Promise<TransactionContext>;
 }
 
 /**
@@ -174,22 +173,16 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         return this.delegate.initialize(this._baseURL.toString(), DEFAULT_FORMAT);
     }
 
-    async openTransaction(modelUri: string): Promise<TransactionContext> {
-        let uri: URI;
-        try {
-            uri = validateModelURI(modelUri);
-        } catch (error) {
-            this.logger.error(error);
-            return Promise.reject();
-        }
-        if (this.transactions.has(uri.toString())) {
+    async openTransaction(modelUri: URI): Promise<TransactionContext> {
+        const uriKey = modelUri.normalize().toString();
+        if (this.transactions.has(uriKey)) {
             // Open a nested transaction
-            return this.transactions.get(uri.toString()).openTransaction();
+            return this.transactions.get(uriKey).openTransaction();
         }
 
         const clientID = uuid();
 
-        return axios.post(this.makeURL('transaction', { modeluri: uri.toString() }), { data: clientID }).then(response => {
+        return axios.post(this.makeURL('transaction', { modeluri: modelUri.toString() }), { data: clientID }).then(response => {
             const { uri: transactionURI } = (response.data as CreateTransactionResponseBody).data;
             const result = new DefaultTransactionContext(
                 transactionURI,
@@ -198,8 +191,8 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
                 this.triggerProviderRegistry,
                 this.logger
             );
-            this.transactions.set(uri.toString(), result);
-            return result.open(tc => this.closeTransaction(uri, tc));
+            this.transactions.set(uriKey, result);
+            return result.open(tc => this.closeTransaction(modelUri, tc));
         });
     }
 
@@ -370,7 +363,7 @@ class DefaultTransactionContext implements TransactionContext {
 
     constructor(
         protected readonly transactionURI: string,
-        protected readonly modelURI: string,
+        protected readonly modelURI: URI,
         protected readonly commandProviderRegistry: CommandProviderRegistry,
         protected readonly triggerProviderRegistry: TriggerProviderRegistry,
         protected readonly logger: Logger
@@ -385,7 +378,7 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     // Doc inherited from `EditTransaction` interface
-    getModelURI(): string {
+    getModelURI(): URI {
         return this.modelURI;
     }
 
@@ -490,7 +483,7 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     // Doc inherited from `Executor` interface
-    async execute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
+    async execute(modelUri: URI, command: ModelServerCommand): Promise<ModelUpdateResult> {
         if (!this.isOpen()) {
             return Promise.reject('Socket is closed.');
         }
@@ -499,7 +492,7 @@ class DefaultTransactionContext implements TransactionContext {
     }
 
     /** Internal implementation of the {@link TransactionContext.execute} method. */
-    async doExecute(modelUri: string, command: ModelServerCommand): Promise<ModelUpdateResult> {
+    async doExecute(modelUri: URI, command: ModelServerCommand): Promise<ModelUpdateResult> {
         // Hook in command-provider plug-ins
         if (!this.commandProviderRegistry.hasProvider(command.type)) {
             // Not handled. Send along to the Model Server
@@ -688,7 +681,7 @@ class DefaultTransactionContext implements TransactionContext {
     protected message(type: MessageBody['type'], data: unknown = {}): MessageBody {
         return {
             type,
-            modelUri: this.modelURI,
+            modelUri: this.modelURI.toString(),
             data
         };
     }

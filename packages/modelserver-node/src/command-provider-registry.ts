@@ -13,6 +13,7 @@ import { AddCommand, ModelServerCommand, RemoveCommand, SetCommand } from '@ecli
 import { CommandProvider, Logger, Transaction } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 /**
  * A registry of command providers from _Model Server_ plug-ins.
@@ -93,7 +94,7 @@ export class CommandProviderRegistry {
      * @returns the provided command, command transaction, or the original `customCommand` standing in for itself
      *    if no provider can handle the custom command
      */
-    async getCommands(modelUri: string, customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
+    async getCommands(modelUri: URI, customCommand: ModelServerCommand): Promise<ModelServerCommand | Operation[] | Transaction> {
         let result: ModelServerCommand | Operation[] | Transaction | undefined;
         const provider = this.getProvider(customCommand);
         if (provider) {

@@ -69,7 +69,7 @@ export class DefaultModelService implements ModelService {
     edit(patch: Operation | Operation[]): Promise<ModelUpdateResult>;
     edit(command: ModelServerCommand): Promise<ModelUpdateResult>;
     edit(patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
-        return this.editService.edit(this.getModelURI().toString(), patchOrCommand);
+        return this.editService.edit(this.getModelURI(), patchOrCommand);
     }
 
     undo(): Promise<ModelUpdateResult> {
@@ -81,11 +81,11 @@ export class DefaultModelService implements ModelService {
     }
 
     openTransaction(): Promise<EditTransaction> {
-        return this.client.openTransaction(this.getModelURI().toString());
+        return this.client.openTransaction(this.getModelURI());
     }
 
     validate(): Promise<Diagnostic> {
-        return this.validator.validate(this.getModelURI().toString());
+        return this.validator.validate(this.getModelURI());
     }
 
     async create<M extends AnyObject>(content: M, format?: string): Promise<M> {

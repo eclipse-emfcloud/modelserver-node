@@ -11,6 +11,7 @@
 import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { Request, RequestHandler, Response } from 'express';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { ValidationManager } from '../services/validation-manager';
@@ -67,7 +68,7 @@ export class ValidationRoutes implements RouteProvider {
                 return;
             }
 
-            this.validationManager.validate(modelURI).then(relay(res)).catch(handleError(res));
+            this.validationManager.validate(new URI(modelURI)).then(relay(res)).catch(handleError(res));
         };
     }
 }

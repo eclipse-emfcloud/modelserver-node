@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 import { ModelServerCommand } from '@eclipse-emfcloud/modelserver-client';
+import * as URI from 'urijs';
 
 import { Transaction } from './executor';
 import { MaybePromise } from './util';
@@ -39,5 +40,5 @@ export interface CommandProvider {
      * @returns either a command to substitute for the custom command (perhaps a compound command) or a
      *     transaction that should be run in the context of a transactional compound command {@link Executor}
      */
-    getCommands(modelUri: string, customCommand: ModelServerCommand): MaybePromise<ModelServerCommand | Transaction>;
+    getCommands(modelUri: URI, customCommand: ModelServerCommand): MaybePromise<ModelServerCommand | Transaction>;
 }

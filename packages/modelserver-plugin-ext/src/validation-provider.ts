@@ -10,9 +10,9 @@
  *******************************************************************************/
 
 import { Diagnostic, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
+import * as URI from 'urijs';
 
 import { MaybePromise } from './util';
-
 /**
  * Protocol for a provider of custom validation rules that may be registered by a _Model Server_ plug-in.
  */
@@ -26,7 +26,7 @@ export interface ValidationProvider {
      * @param modelURI the URI of the model resource
      * @returns whether the provider can and will validate the given `model`
      */
-    canValidate(model: ModelServerObjectV2, modelURI: string): boolean;
+    canValidate(model: ModelServerObjectV2, modelURI: URI): boolean;
 
     /**
      * Validate the given `model`.
@@ -35,5 +35,5 @@ export interface ValidationProvider {
      * @param modelURI the URI of the model resource
      * @returns the result of validation of the `model`
      */
-    validate(model: ModelServerObjectV2, modelURI: string): MaybePromise<Diagnostic>;
+    validate(model: ModelServerObjectV2, modelURI: URI): MaybePromise<Diagnostic>;
 }

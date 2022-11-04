@@ -11,8 +11,10 @@
 import { Diagnostic, encode, ModelServerObjectV2 } from '@eclipse-emfcloud/modelserver-client';
 import { Logger } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named, postConstruct } from 'inversify';
+import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
+import { validateModelURI } from '../client/uri-utils';
 import { JSONSocket } from '../client/web-socket-utils';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
 import { SubscriptionManager } from './subscription-manager';
@@ -41,15 +43,15 @@ export class ValidationManager {
     initialize(): void {
         this.subscriptionManager.addSubscribedListener((client, params) => {
             if (params.livevalidation) {
-                this.initializeLiveValidation(client, params.modeluri);
+                this.initializeLiveValidation(client, validateModelURI(params.modeluri));
             }
         });
     }
 
-    async validate(modelURI: string): Promise<Diagnostic> {
+    async validate(modelURI: URI): Promise<Diagnostic> {
         let model: ModelServerObjectV2;
         try {
-            model = await this.modelServerClient.get(modelURI).then(asModelServerObject);
+            model = await this.modelServerClient.get(modelURI.toString()).then(asModelServerObject);
             if (!model) {
                 throw new Error(`Could not retrieve model '${modelURI}' to validate.`);
             }
@@ -59,7 +61,7 @@ export class ValidationManager {
         }
 
         this.logger.debug(`Performing core validation of ${modelURI}`);
-        const defaultDiagnostic = await this.modelServerClient.validate(modelURI);
+        const defaultDiagnostic = await this.modelServerClient.validate(modelURI.toString());
 
         this.logger.debug(`Performing custom validation of ${modelURI}`);
         const providedDiagnostic = await this.validationProviderRegistry.validate(model, modelURI);
@@ -75,7 +77,7 @@ export class ValidationManager {
      * @param modelURI the model URI to validate
      * @returns whether validation was successfully performed and broadcast (not whether it found no problems)
      */
-    async performLiveValidation(modelURI: string): Promise<boolean> {
+    async performLiveValidation(modelURI: URI): Promise<boolean> {
         // Short-circuit if there are no live validation subscribers
         if (!this.subscriptionManager.hasValidationSubscribers(modelURI)) {
             this.logger.debug(`No subscribers to live validation for ${modelURI}.`);
@@ -91,7 +93,7 @@ export class ValidationManager {
             });
     }
 
-    protected async initializeLiveValidation(client: JSONSocket, modelURI: string): Promise<unknown> {
+    protected async initializeLiveValidation(client: JSONSocket, modelURI: URI): Promise<unknown> {
         return this.validate(modelURI)
             .then(diagnostics => this.subscriptionManager.sendValidation(client, diagnostics))
             .catch(error => this.logger.error(`Failed to initialize live validation in subscription to ${modelURI}: ${error}`));

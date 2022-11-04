@@ -19,6 +19,7 @@ import {
     ValidationProvider
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { inject, injectable, named } from 'inversify';
+import * as URI from 'urijs';
 
 /**
  * A simple example of a plug-in that provides custom validation.
@@ -47,11 +48,11 @@ export class ExampleCustomValidationPlugin implements ModelServerPlugin {
 class CoffeeMachineValidator implements ValidationProvider {
     constructor(protected readonly modelServerClient: ModelServerClientApi, protected readonly logger: Logger) {}
 
-    canValidate(model: ModelServerObjectV2, modelURI: string): boolean {
+    canValidate(model: ModelServerObjectV2, modelURI: URI): boolean {
         return true; // Nothing further to check than the pattern supplied at registration
     }
 
-    validate(model: ModelServerObjectV2, modelURI: string): Diagnostic {
+    validate(model: ModelServerObjectV2, modelURI: URI): Diagnostic {
         const probabilityTest = Math.random();
         if (probabilityTest < 0.5) {
             return Diagnostic.ok();
