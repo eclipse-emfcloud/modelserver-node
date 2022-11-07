@@ -10,12 +10,21 @@
  *******************************************************************************/
 import {
     CompoundCommand,
+    ModelServerCommand,
     ModelServerNotificationListenerV2,
     ModelServerObjectV2,
     NotificationSubscriptionListenerV2,
+    Operations,
+    SetCommand,
     WARNING
 } from '@eclipse-emfcloud/modelserver-client';
-import { ModelServerClientApi, ModelService, ModelServiceFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import {
+    CommandProvider,
+    ModelServerClientApi,
+    ModelService,
+    ModelServiceFactory,
+    TriggerProvider
+} from '@eclipse-emfcloud/modelserver-plugin-ext';
 import * as chai from 'chai';
 import { expect } from 'chai';
 import * as chaiLike from 'chai-like';
@@ -26,15 +35,7 @@ import * as URI from 'urijs';
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
-import {
-    _assumeThat,
-    awaitClosed,
-    findDiagnostic,
-    listenForFullUpdate,
-    registerCommand,
-    registerTrigger,
-    requireArray
-} from './test-helpers';
+import { assumeThatCondition, awaitClosed, findDiagnostic, listenForFullUpdate, requireArray } from './test-helpers';
 import { CoffeeMachine, isCoffeeMachine } from './test-model-helper';
 import { ServerFixture } from './test-server-fixture';
 
@@ -51,7 +52,7 @@ chai.use(chaiLike);
 const pass = (): void => {};
 
 describe('DefaultModelService', () => {
-    let assumeThat: (...args: Parameters<typeof _assumeThat>) => void;
+    let assumeThat: (...args: Parameters<typeof assumeThatCondition>) => void;
     const modelURI = new URI('SuperBrewer3000.coffee');
     const diagnosticSource = 'Mocha Tests';
     let client: ModelServerClientApi;
@@ -64,7 +65,7 @@ describe('DefaultModelService', () => {
     let commandReg: CommandProviderRegistry;
 
     beforeEach(function () {
-        assumeThat = _assumeThat.bind(this);
+        assumeThat = assumeThatCondition.bind(this);
         const modelServiceFactory: ModelServiceFactory = container.get(ModelServiceFactory);
         modelService = modelServiceFactory(modelURI);
         client = container.get(ModelServerClientApi);
@@ -380,7 +381,7 @@ describe('DefaultModelService', () => {
 
         beforeEach(function () {
             newModelURI = new URI('ModelServiceTest.coffee');
-            assumeThat = _assumeThat.bind(this);
+            assumeThat = assumeThatCondition.bind(this);
             const modelServiceFactory: ModelServiceFactory = container.get(ModelServiceFactory);
             newModelService = modelServiceFactory(newModelURI);
         });
@@ -473,3 +474,50 @@ describe('DefaultModelService', () => {
         });
     });
 });
+
+/**
+ * Register a test trigger.
+ *
+ * @param triggerRegistry the trigger registry
+ * @returns a function that unregisters the test trigger
+ */
+function registerTrigger(triggerRegistry: TriggerProviderRegistry): () => void {
+    const endsWithNumber = (s: string): boolean => /\d+$/.test(s);
+
+    const triggerProvider: TriggerProvider = {
+        canTrigger: () => true,
+        getTriggers: (_modelURI, modelDelta) => {
+            if (modelDelta.length === 1 && Operations.isReplace(modelDelta[0], 'string') && !endsWithNumber(modelDelta[0].value)) {
+                return [
+                    {
+                        op: 'replace',
+                        path: modelDelta[0].path,
+                        value: `${modelDelta[0].value} 1`
+                    }
+                ];
+            }
+            return [];
+        }
+    };
+
+    const id = triggerRegistry.register(triggerProvider);
+
+    return () => triggerRegistry.unregister(id, triggerProvider);
+}
+
+/**
+ * Register a test command.
+ *
+ * @param commandRegistry the command registry
+ * @returns a function that unregisters the test command
+ */
+function registerCommand(commandRegistry: CommandProviderRegistry): () => void {
+    const provider: CommandProvider = {
+        canHandle: () => true,
+        getCommands: (_modelUri, customCommand: ModelServerCommand) =>
+            new SetCommand(customCommand.owner!, 'name', [customCommand.getProperty('newName') as string])
+    };
+    commandRegistry.register('test-set-name', provider);
+
+    return () => commandRegistry.unregister('test-set-name', provider);
+}

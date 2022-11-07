@@ -9,7 +9,7 @@ module.exports = {
     },
     overrides: [
         {
-            files: ['*.spec.ts', 'test-*.ts'],
+            files: ['**/test/*.ts'],
             rules: {
                 'no-unused-expressions': 0,
                 'no-invalid-this': 0

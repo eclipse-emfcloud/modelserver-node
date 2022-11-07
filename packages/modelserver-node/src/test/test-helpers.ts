@@ -8,15 +8,13 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-import { Diagnostic, ModelServerCommand, Operations, SetCommand, SubscriptionListener } from '@eclipse-emfcloud/modelserver-client';
+import { Diagnostic, SubscriptionListener } from '@eclipse-emfcloud/modelserver-client';
 import {
-    CommandProvider,
     EditTransaction,
     MiddlewareProvider,
     ModelServerClientApi,
     RouteProvider,
-    RouterFactory,
-    TriggerProvider
+    RouterFactory
 } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { expect } from 'chai';
 import { IRoute, IRouter, NextFunction, Request, RequestHandler, Response } from 'express';
@@ -25,9 +23,6 @@ import { Context } from 'mocha';
 import * as sinon from 'sinon';
 import * as URI from 'urijs';
 import * as WebSocket from 'ws';
-
-import { CommandProviderRegistry } from '../command-provider-registry';
-import { TriggerProviderRegistry } from '../trigger-provider-registry';
 
 export type MockMiddleware = sinon.SinonSpy<[req: Request, res: Response, next: NextFunction], any>;
 
@@ -142,7 +137,7 @@ export function requireArray(owner: object, propertyName: string): unknown[] {
     return owner[propertyName] as unknown[];
 }
 
-export function _assumeThat(this: Context, condition: boolean, reason: string): void {
+export function assumeThatCondition(this: Context, condition: boolean, reason: string): void {
     if (!condition) {
         if (this.test) {
             this.test.title = `${this.test.title} - skipped: ${reason}`;
@@ -163,53 +158,6 @@ export function findDiagnostic(diagnostic: Diagnostic, source: string): Diagnost
     }
 
     return undefined;
-}
-
-/**
- * Register a test trigger.
- *
- * @param triggerRegistry the trigger registry
- * @returns a function that unregisters the test trigger
- */
-export function registerTrigger(triggerRegistry: TriggerProviderRegistry): () => void {
-    const endsWithNumber = (s: string): boolean => /\d+$/.test(s);
-
-    const triggerProvider: TriggerProvider = {
-        canTrigger: () => true,
-        getTriggers: (_modelURI, modelDelta) => {
-            if (modelDelta.length === 1 && Operations.isReplace(modelDelta[0], 'string') && !endsWithNumber(modelDelta[0].value)) {
-                return [
-                    {
-                        op: 'replace',
-                        path: modelDelta[0].path,
-                        value: `${modelDelta[0].value} 1`
-                    }
-                ];
-            }
-            return [];
-        }
-    };
-
-    const id = triggerRegistry.register(triggerProvider);
-
-    return () => triggerRegistry.unregister(id, triggerProvider);
-}
-
-/**
- * Register a test command.
- *
- * @param commandRegistry the command registry
- * @returns a function that unregisters the test command
- */
-export function registerCommand(commandRegistry: CommandProviderRegistry): () => void {
-    const provider: CommandProvider = {
-        canHandle: () => true,
-        getCommands: (_modelUri, customCommand: ModelServerCommand) =>
-            new SetCommand(customCommand.owner!, 'name', [customCommand.getProperty('newName') as string])
-    };
-    commandRegistry.register('test-set-name', provider);
-
-    return () => commandRegistry.unregister('test-set-name', provider);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
