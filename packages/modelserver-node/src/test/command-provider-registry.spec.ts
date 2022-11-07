@@ -14,7 +14,7 @@ import { expect } from 'chai';
 import { Container } from 'inversify';
 import * as URI from 'urijs';
 
-import { CommandProviderRegistry } from './command-provider-registry';
+import { CommandProviderRegistry } from '../command-provider-registry';
 
 describe('CommandProviderRegistry', () => {
     let registry: CommandProviderRegistry;

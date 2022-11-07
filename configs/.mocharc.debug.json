@@ -4,6 +4,6 @@
   "reporter": "spec",
   "color": true,
   "watch-files": ["*.ts", "*.tsx"],
-  "timeout": 2000,
-  "spec": ["**/test/*.spec.ts"]
+  "timeout": 0,
+  "extension": ["spec.ts"]
 }

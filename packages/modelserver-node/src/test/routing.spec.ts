@@ -19,8 +19,8 @@ import * as http from 'http';
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
 
-import { createContainer } from './di';
-import { ModelServer } from './server';
+import { createContainer } from '../di';
+import { ModelServer } from '../server';
 
 /**
  * Tests for integration of _Express_ routers and middlewares contributed by `RouteProvider`s and `MiddlewareProvider`s.

@@ -10,7 +10,7 @@
  *******************************************************************************/
 import { expect } from 'chai';
 
-import { CompletablePromise } from './promise-utils';
+import { CompletablePromise } from '../client/promise-utils';
 
 describe('CompletablePromise', () => {
     it('#resolve', async () => {

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { ModelServerCommand } from '@eclipse-emfcloud/modelserver-client';
-import { Logger, Transaction, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
+import { Executor, Logger, Transaction, TriggerProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { assert } from '@sinonjs/referee';
 import { expect } from 'chai';
 import { Operation } from 'fast-json-patch';
@@ -17,7 +17,7 @@ import { Container } from 'inversify';
 import * as sinon from 'sinon';
 import * as URI from 'urijs';
 
-import { TriggerProviderRegistry } from './trigger-provider-registry';
+import { TriggerProviderRegistry } from '../trigger-provider-registry';
 
 describe('TriggerProviderRegistry', () => {
     let registry: TriggerProviderRegistry;
@@ -82,17 +82,17 @@ describe('TriggerProviderRegistry', () => {
         it('multiple providers match', async () => {
             const provider = registry.getProvider(new URI('test:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(provider).to.exist;
-            const trigger = await provider.getTriggers(new URI('test:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
+            const trigger = await provider!.getTriggers(new URI('test:a'), [{ op: 'replace', path: '/foo/bar/size', value: 42 }]);
             expect(trigger).to.be.a('function');
 
             const transaction = trigger as Transaction;
             const counter = new AsyncCounter();
             const executor = sinon.spy({
-                execute: async (modelUri: URI, command: ModelServerCommand) => counter.tick({ success: true }),
-                applyPatch: async (patch: Operation | Operation[]) => counter.tick({ success: true })
+                execute: async (_modelUri: URI, _command: ModelServerCommand) => counter.tick({ success: true }),
+                applyPatch: async (_patch: Operation | Operation[]) => counter.tick({ success: true })
             });
 
-            await transaction(executor);
+            await transaction(executor as Executor);
 
             expect(counter.count).to.be.equal(2);
             assert(executor.applyPatch.calledWith(sinon.match.every(sinon.match({ path: '/foo/bar/name' }))));
