@@ -11,14 +11,16 @@
 import { ModelServerClientV2 } from '@eclipse-emfcloud/modelserver-client';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Container } from 'inversify';
+import * as URI from 'urijs';
 
 import { createContainer } from '../di';
 import { ModelServer } from '../server';
 
 /** A representation of the upstream _Model Server_, which may or may not be available to tests that need it. */
 class UpstreamServer {
-    /** The upstream server's base URL. */
-    protected readonly baseURL = 'http://localhost:8081/api/v2';
+    /** The upstream server's base URL, e.g. http://localhost:8081/api/v2 */
+    protected readonly upstreamPort = '8081';
+    protected readonly baseURL = new URI({ protocol: 'http', hostname: 'localhost', port: this.upstreamPort, path: 'api/v2' });
 
     /**
      * Test whether the upstream server is available. If not, then call the `ifNot` call-back.
@@ -50,12 +52,17 @@ class UpstreamServer {
 export class ServerFixture {
     static upstream = new UpstreamServer();
 
-    readonly baseUrl: string;
+    readonly baseUrl: URI;
     readonly client: ModelServerClientV2;
     protected server: ModelServer;
 
     constructor(protected readonly containerConfig?: (container: Container) => void) {
-        this.baseUrl = 'http://localhost:8082/api/v2';
+        this.baseUrl = new URI({
+            protocol: 'http',
+            hostname: 'localhost',
+            port: '8082',
+            path: 'api/v2'
+        });
         this.client = new ModelServerClientV2();
         this.client.initialize(this.baseUrl, 'json-v2');
 

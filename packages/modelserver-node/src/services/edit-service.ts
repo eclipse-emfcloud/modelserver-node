@@ -87,10 +87,10 @@ export class EditService {
 
             if (isModelServerCommand(providedEdit)) {
                 // Command case
-                result = this.modelServerClient.edit(modelURI.toString(), providedEdit);
+                result = this.modelServerClient.edit(modelURI, providedEdit);
             } else {
                 // JSON Patch case
-                result = this.modelServerClient.edit(modelURI.toString(), providedEdit);
+                result = this.modelServerClient.edit(modelURI, providedEdit);
             }
 
             return result.then(this.performPatchValidation(modelURI));

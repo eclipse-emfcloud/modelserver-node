@@ -53,7 +53,7 @@ const pass = (): void => {};
 
 describe('DefaultModelService', () => {
     let assumeThat: (...args: Parameters<typeof assumeThatCondition>) => void;
-    const modelURI = new URI('SuperBrewer3000.coffee');
+    const modeluri = new URI('SuperBrewer3000.coffee');
     const diagnosticSource = 'Mocha Tests';
     let client: ModelServerClientApi;
     let container: Container; // An independent client for model fixture maintenance
@@ -67,7 +67,7 @@ describe('DefaultModelService', () => {
     beforeEach(function () {
         assumeThat = assumeThatCondition.bind(this);
         const modelServiceFactory: ModelServiceFactory = container.get(ModelServiceFactory);
-        modelService = modelServiceFactory(modelURI);
+        modelService = modelServiceFactory(modeluri);
         client = container.get(ModelServerClientApi);
         triggerReg = container.get(TriggerProviderRegistry);
         commandReg = container.get(CommandProviderRegistry);
@@ -88,7 +88,7 @@ describe('DefaultModelService', () => {
     });
 
     it('getModelURI()', () => {
-        expect(modelService.getModelURI()).to.be.eq(modelURI);
+        expect(modelService.getModelURI()).to.be.eq(modeluri);
     });
 
     it('Model()', async () => {
@@ -124,7 +124,7 @@ describe('DefaultModelService', () => {
             expect(result.patch).to.be.like([patch]);
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
@@ -142,12 +142,12 @@ describe('DefaultModelService', () => {
             unregister();
 
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
     it('edit(command)', async () => {
-        const model = await client.get(modelURI.toString());
+        const model = await client.get(modeluri);
         expect(model['workflows']).to.be.an('array').that.is.not.empty;
         const workflows = requireArray(model, 'workflows');
         const workflow = workflows[0] as ModelServerObjectV2;
@@ -159,7 +159,7 @@ describe('DefaultModelService', () => {
         command.setProperty('newName', 'Heat Up First');
         command.owner = {
             eClass: preheatTask.$type,
-            $ref: `${modelURI}#${preheatTask.$id}`
+            $ref: `${modeluri}#${preheatTask.$id}`
         };
 
         const unregister = registerCommand(commandReg);
@@ -171,12 +171,12 @@ describe('DefaultModelService', () => {
         } finally {
             unregister();
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
     it('edit(command) includes triggers', async () => {
-        const model = await client.get(modelURI.toString());
+        const model = await client.get(modeluri);
         expect(model['workflows']).to.be.an('array').that.is.not.empty;
         const workflows = requireArray(model, 'workflows');
         const workflow = workflows[0] as ModelServerObjectV2;
@@ -188,7 +188,7 @@ describe('DefaultModelService', () => {
         command.setProperty('newName', 'Heat Up First');
         command.owner = {
             eClass: preheatTask.$type,
-            $ref: `${modelURI}#${preheatTask.$id}`
+            $ref: `${modeluri}#${preheatTask.$id}`
         };
 
         const unregisterCommand = registerCommand(commandReg);
@@ -205,7 +205,7 @@ describe('DefaultModelService', () => {
             unregisterTrigger();
             unregisterCommand();
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
@@ -236,7 +236,7 @@ describe('DefaultModelService', () => {
             expect(redoResult.patch).to.be.like([patch]);
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
@@ -251,7 +251,7 @@ describe('DefaultModelService', () => {
 
         const transaction = await modelService.openTransaction();
         expect(transaction.isOpen()).to.be.true;
-        expect(transaction.getModelURI().toString()).to.be.string(modelURI.toString());
+        expect(transaction.getModelURI().toString()).to.equal(modeluri.toString());
 
         const result = await transaction.edit(patch);
         expect(result.success).to.be.true;
@@ -260,7 +260,7 @@ describe('DefaultModelService', () => {
         await transaction.rollback('Testing roll-back.');
         await awaitClosed(transaction);
 
-        const model = await client.get(modelURI.toString());
+        const model = await client.get(modeluri);
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
@@ -279,12 +279,12 @@ describe('DefaultModelService', () => {
 
         try {
             await awaitClosed(transaction);
-            const model = await client.get(modelURI.toString());
+            const model = await client.get(modeluri);
             const actual = getValueByPointer(model, '/workflows/0/name');
             expect(actual).to.be.string('New Name');
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
@@ -308,7 +308,7 @@ describe('DefaultModelService', () => {
         expect(child.isOpen()).to.be.false;
         expect(transaction.isOpen()).to.be.false;
 
-        const model = await client.get(modelURI.toString());
+        const model = await client.get(modeluri);
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
@@ -336,12 +336,12 @@ describe('DefaultModelService', () => {
 
         try {
             await awaitClosed(transaction);
-            const model = await client.get(modelURI.toString());
+            const model = await client.get(modeluri);
             const actual = getValueByPointer(model, '/workflows/0/name');
             expect(actual).to.be.string('New Name');
         } finally {
             // Don't interfere with other tests
-            await client.undo(modelURI.toString());
+            await client.undo(modeluri);
         }
     });
 
@@ -366,7 +366,7 @@ describe('DefaultModelService', () => {
         await transaction.rollback('Testing parent roll-back.');
         await awaitClosed(transaction);
 
-        const model = await client.get(modelURI.toString());
+        const model = await client.get(modeluri);
         const actual = getValueByPointer(model, '/workflows/0/name');
         expect(actual).to.be.string('Simple Workflow');
     });
@@ -388,11 +388,11 @@ describe('DefaultModelService', () => {
 
         afterEach(async () => {
             const uris = await client.getModelUris();
-            if (!uris.includes(newModelURI.toString())) {
+            if (!uris.find(uri => uri.equals(newModelURI))) {
                 return Promise.resolve();
             } else {
                 // Clean up this model
-                return client.delete(newModelURI.toString()).catch(pass);
+                return client.delete(newModelURI).catch(pass);
             }
         });
 
@@ -400,7 +400,7 @@ describe('DefaultModelService', () => {
             const result = await newModelService.create(modelContent);
             expect(result).to.be.like(modelContent);
 
-            const actual = await client.get(newModelURI.toString(), isCoffeeMachine);
+            const actual = await client.get(newModelURI, isCoffeeMachine);
             expect(actual).to.be.like(modelContent);
         });
 
@@ -418,7 +418,7 @@ describe('DefaultModelService', () => {
                 const actual = await closed;
                 expect(actual).to.be.true;
             } finally {
-                client.unsubscribe(newModelURI.toString());
+                client.unsubscribe(newModelURI);
             }
         });
 
@@ -427,13 +427,13 @@ describe('DefaultModelService', () => {
             assumeThat(!!model, 'Model not created.');
 
             const patch: Operation = { op: 'replace', path: '/name', value: 'New Name' };
-            const edited = await client.edit(newModelURI.toString(), patch);
+            const edited = await client.edit(newModelURI, patch);
             assumeThat(edited.success, 'Model edit failed.');
 
             const dirtyState = new Promise<boolean>(resolve => {
                 const listener: ModelServerNotificationListenerV2 = {
                     onError: notif => {
-                        expect.fail(`Error in ${notif.modelUri} subscription: ${notif.error}`);
+                        expect.fail(`Error in ${notif.modeluri} subscription: ${notif.error}`);
                     },
                     onDirtyStateChanged: notif => {
                         if (!notif.isDirty) {
@@ -441,7 +441,7 @@ describe('DefaultModelService', () => {
                         }
                     }
                 };
-                client.subscribe(newModelURI.toString(), new NotificationSubscriptionListenerV2(listener));
+                client.subscribe(newModelURI, new NotificationSubscriptionListenerV2(listener));
             });
 
             try {
@@ -451,7 +451,7 @@ describe('DefaultModelService', () => {
                 const actual = await dirtyState;
                 expect(actual).to.be.false;
             } finally {
-                client.unsubscribe(newModelURI.toString());
+                client.unsubscribe(newModelURI);
             }
         });
 
@@ -469,7 +469,7 @@ describe('DefaultModelService', () => {
                 const actual = await deleted;
                 expect(actual).to.be.true;
             } finally {
-                client.unsubscribe(newModelURI.toString());
+                client.unsubscribe(newModelURI);
             }
         });
     });
@@ -514,7 +514,7 @@ function registerTrigger(triggerRegistry: TriggerProviderRegistry): () => void {
 function registerCommand(commandRegistry: CommandProviderRegistry): () => void {
     const provider: CommandProvider = {
         canHandle: () => true,
-        getCommands: (_modelUri, customCommand: ModelServerCommand) =>
+        getCommands: (_modeluri: URI, customCommand: ModelServerCommand) =>
             new SetCommand(customCommand.owner!, 'name', [customCommand.getProperty('newName') as string])
     };
     commandRegistry.register('test-set-name', provider);

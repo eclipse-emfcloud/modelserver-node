@@ -56,7 +56,7 @@ class IncrementDurationTriggerProvider implements TriggerProvider {
         // we have all the information we need in the `modelDelta`. But in the general case,
         // a trigger provider will need to find other related objects in the model and generate
         // new changes from those, so that's how we do it here
-        const model = await this.modelServerClient.get(modelURI.toString());
+        const model = await this.modelServerClient.get(modelURI);
         const result: Operation[] = [];
 
         // Take only the last change to any given duration in case of multiple (such as
@@ -66,7 +66,7 @@ class IncrementDurationTriggerProvider implements TriggerProvider {
             // Don't update if already a multiple of ten
             if (element && op.value % 10 !== 0) {
                 this.logger.debug('Rounding up duration %d of object at %s', op.value, op.path);
-                result.push(replace(modelURI.toString(), element, 'duration', roundUp(op.value, 10)));
+                result.push(replace(modelURI, element, 'duration', roundUp(op.value, 10)));
             }
         });
 

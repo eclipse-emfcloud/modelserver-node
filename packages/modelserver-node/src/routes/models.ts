@@ -102,8 +102,8 @@ export class ModelsRoutes implements RouteProvider {
             const isCreate = req.method.toUpperCase() === 'POST';
             this.logger.debug(`Delegating ${isCreate ? 'creation' : 'update'} of ${modeluri.toString()}.`);
             const delegated = isCreate //
-                ? this.modelServerClient.create(modeluri.toString(), model, format)
-                : this.modelServerClient.update(modeluri.toString(), model, format);
+                ? this.modelServerClient.create(modeluri, model, format)
+                : this.modelServerClient.update(modeluri, model, format);
 
             delegated.then(this.performModelValidation(modeluri)).then(relay(res)).catch(handleError(res));
         };
