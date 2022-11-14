@@ -204,7 +204,7 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
 
     protected makeURL(path: string, modeluri: URI): string {
         const uri = this._baseURL.clone();
-        uri.segment(path);
+        path.split('/').forEach(seg => uri.segment(seg));
         uri.addQuery('modeluri', modeluri);
         return uri.toString();
     }

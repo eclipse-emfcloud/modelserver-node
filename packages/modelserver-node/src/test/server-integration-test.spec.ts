@@ -36,6 +36,7 @@ chai.use(chaiLike);
 describe('Server Integration Tests', () => {
     describe('Requests simply forwarded to upstream', () => {
         let middleware: MockMiddleware;
+        const modeluri = new URI('SuperBrewer3000.coffee');
 
         const server: ServerFixture = new ServerFixture(container => {
             middleware = provideMiddleware(container);
@@ -44,7 +45,7 @@ describe('Server Integration Tests', () => {
         const { client } = server;
 
         it('GET /models', async () => {
-            const machine = await client.get('SuperBrewer3000.coffee', isCoffeeMachine);
+            const machine = await client.get(modeluri, isCoffeeMachine);
             expect(machine.name).to.be.equal('Super Brewer 3000');
         });
 
@@ -141,6 +142,8 @@ describe('Server Integration Tests', () => {
     });
 
     describe('TransactionContext', async () => {
+        const modeluri = new URI('SuperBrewer3000.coffee');
+
         const server: ServerFixture = new ServerFixture();
         server.requireUpstreamServer();
 
@@ -157,7 +160,7 @@ describe('Server Integration Tests', () => {
         });
 
         beforeEach(async () => {
-            transaction = await client.openTransaction(new URI('SuperBrewer3000.coffee'));
+            transaction = await client.openTransaction(modeluri);
         });
 
         afterEach(async () => {
@@ -166,7 +169,7 @@ describe('Server Integration Tests', () => {
                 await awaitClosed(transaction);
             } else {
                 // Don't interfere with the data expected by other tests
-                await client.undo('SuperBrewer3000.coffee');
+                await client.undo(modeluri);
             }
         });
 

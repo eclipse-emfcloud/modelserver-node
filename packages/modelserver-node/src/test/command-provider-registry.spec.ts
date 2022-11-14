@@ -53,17 +53,19 @@ class TestCommandProvider implements CommandProvider {
         return true;
     }
 
-    getCommands(modelUri: URI, customCommand: ModelServerCommand): Transaction {
+    getCommands(_modelUri: URI, customCommand: ModelServerCommand): Transaction {
         if (!customCommand.owner) {
             console.error('custom command owner was unexpectedly undefined');
             return async () => false;
         }
 
+        const commandModelUri = new URI(customCommand.owner.$ref).fragment('');
+
         return async executor => {
             const obj = { $id: 'any-id', $type: 'any-type', label: 'anyLabel' };
 
             if (obj) {
-                const setCommand = replace(modelUri, obj, 'label', 'newLabel');
+                const setCommand = replace(commandModelUri, obj, 'label', 'newLabel');
                 const executionResult = (await executor.applyPatch(setCommand)).patch;
                 if (!executionResult || !executionResult.length) {
                     return false; // Failed to complete the chain, so roll back
