@@ -200,7 +200,7 @@ export function listenForFullUpdate(
                 onOpen: () => resolveListening(true),
                 onClose: pass
             };
-            client.subscribe(modelURI.toString(), listener);
+            client.subscribe(modelURI, listener);
         });
     });
     return { ready: listening, done: result! };

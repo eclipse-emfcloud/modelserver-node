@@ -15,7 +15,7 @@ import { inject, injectable, named } from 'inversify';
 import * as URI from 'urijs';
 import { v4 as uuid } from 'uuid';
 
-type ValidationProviderFilter = (model: ModelServerObjectV2, modelURI: string) => boolean;
+type ValidationProviderFilter = (model: ModelServerObjectV2, modelURI: URI) => boolean;
 
 export type Validator = (model: ModelServerObjectV2, modelURI: URI) => Promise<Diagnostic>;
 
@@ -67,7 +67,7 @@ export class ValidationProviderRegistry {
         }
     }
 
-    hasProvider(model: ModelServerObjectV2, modelURI: string): boolean {
+    hasProvider(model: ModelServerObjectV2, modelURI: URI): boolean {
         for (const next of this.providers.values()) {
             if (next.filter(model, modelURI)) {
                 return true;
@@ -79,7 +79,7 @@ export class ValidationProviderRegistry {
     getProviders(model: ModelServerObjectV2, modelURI: URI): ValidationProvider[] {
         const result: ValidationProvider[] = [];
         this.providers.forEach(next => {
-            if (next.filter(model, modelURI.toString())) {
+            if (next.filter(model, modelURI)) {
                 result.push(next.provider);
             }
         });
@@ -118,10 +118,10 @@ function createModelTypeFilter(filter?: string | RegExp): (model: ModelServerObj
     return model => filter.test(model.$type);
 }
 
-function createModelURIFilter(filter?: string | RegExp): (modelURI: string) => boolean {
+function createModelURIFilter(filter?: string | RegExp): (modelURI: URI) => boolean {
     if (!filter) return () => true;
-    if (typeof filter === 'string') return modelURI => modelURI.includes(filter);
-    return modelURI => filter.test(modelURI);
+    if (typeof filter === 'string') return modelURI => modelURI.toString().includes(filter);
+    return modelURI => filter.test(modelURI.toString());
 }
 
 function multiValidator(providers: ValidationProvider[]): Validator {

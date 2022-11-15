@@ -54,10 +54,11 @@ class IncrementDurationCommandProvider implements CommandProvider {
     }
 
     getCommands(_modelUri: URI, customCommand: ModelServerCommand): Transaction {
-        const [modelURI, elementID] = customCommand.owner.$ref.split('#');
+        const commandModelUri = new URI(customCommand.owner.$ref).fragment('');
+        const elementID = new URI(customCommand.owner.$ref).fragment();
 
         return async executor => {
-            const element = await this.modelServerClient.getElementById(modelURI, elementID, isTask);
+            const element = await this.modelServerClient.getElementById(commandModelUri, elementID, isTask);
 
             if (element) {
                 this.logger.debug('Got an element: %s.', element);
@@ -65,7 +66,7 @@ class IncrementDurationCommandProvider implements CommandProvider {
                 const newDuration = oldDuration + 1;
                 this.logger.debug(`Setting duration to ${newDuration}.`);
 
-                const setOp = replace(modelURI, element, 'duration', newDuration);
+                const setOp = replace(commandModelUri, element, 'duration', newDuration);
                 const executionResult = (await executor.applyPatch(setOp)).patch;
 
                 if (!executionResult || !executionResult.length) {
@@ -83,7 +84,7 @@ class IncrementDurationCommandProvider implements CommandProvider {
                         : undefined;
                 if (newValue) {
                     const newNewDuration = oldDuration + newValue;
-                    const doubleOp = replace(modelURI, element, 'duration', newNewDuration);
+                    const doubleOp = replace(commandModelUri, element, 'duration', newNewDuration);
                     this.logger.debug(`Updating duration to ${newNewDuration}.`);
                     return executor.applyPatch(doubleOp).then(() => true);
                 }

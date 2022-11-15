@@ -18,6 +18,7 @@ import { IRouter, RequestHandler } from 'express';
 import * as http from 'http';
 import * as sinon from 'sinon';
 import { assert } from 'sinon';
+import * as URI from 'urijs';
 
 import { createContainer } from '../di';
 import { ModelServer } from '../server';
@@ -47,7 +48,8 @@ describe('Routing Tests', () => {
     let client: AxiosInstance;
 
     before(() => {
-        client = axios.create({ baseURL: 'http://localhost:8082' });
+        const baseURL = new URI({ protocol: 'http', hostname: 'localhost', port: '8082' });
+        client = axios.create({ baseURL: baseURL.toString() });
     });
 
     beforeEach(async () => {

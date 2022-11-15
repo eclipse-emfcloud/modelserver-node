@@ -51,7 +51,7 @@ export class ValidationManager {
     async validate(modelURI: URI): Promise<Diagnostic> {
         let model: ModelServerObjectV2;
         try {
-            model = await this.modelServerClient.get(modelURI.toString()).then(asModelServerObject);
+            model = await this.modelServerClient.get(modelURI).then(asModelServerObject);
             if (!model) {
                 throw new Error(`Could not retrieve model '${modelURI}' to validate.`);
             }
@@ -61,7 +61,7 @@ export class ValidationManager {
         }
 
         this.logger.debug(`Performing core validation of ${modelURI}`);
-        const defaultDiagnostic = await this.modelServerClient.validate(modelURI.toString());
+        const defaultDiagnostic = await this.modelServerClient.validate(modelURI);
 
         this.logger.debug(`Performing custom validation of ${modelURI}`);
         const providedDiagnostic = await this.validationProviderRegistry.validate(model, modelURI);

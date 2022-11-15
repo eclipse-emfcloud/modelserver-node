@@ -16,7 +16,8 @@
     "start": "yarn --cwd examples/example-server start",
     "publish:prepare": "lerna version minor --exact --ignore-scripts --yes --no-push",
     "publish:latest": "lerna publish from-git --no-git-reset --no-verify-access --no-push",
-    "publish:next": "SHA=$(git rev-parse --short HEAD) && lerna publish preminor --exact --canary --preid next.${SHA} --dist-tag next --no-git-reset --no-git-tag-version --no-push --ignore-scripts --yes --no-verify-access"
+    "publish:next": "SHA=$(git rev-parse --short HEAD) && lerna publish preminor --exact --canary --preid next.${SHA} --dist-tag next --no-git-reset --no-git-tag-version --no-push --ignore-scripts --yes --no-verify-access",
+    "upgrade:next": "yarn upgrade -p \"@eclipse-emfcloud.*\" --next "
   },
   "devDependencies": {
     "@sinonjs/referee": "^9.1.1",
@@ -24,6 +25,7 @@
     "@types/chai-like": "^1.1.1",
     "@types/mocha": "^9.1.0",
     "@types/sinon": "^10.0.11",
+    "@types/urijs": "^1.19.19",
     "@typescript-eslint/eslint-plugin": "^5.38.1",
     "@typescript-eslint/parser": "^5.38.1",
     "chai": "^4.3.6",
@@ -34,7 +36,6 @@
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-no-null": "^1.0.2",
     "eslint-plugin-prettier": "^4.0.0",
-    "eslint-plugin-simple-import-sort": "^7.0.0",
     "ignore-styles": "^5.0.1",
     "lerna": "^4.0.0",
     "mocha": "^9.2.1",

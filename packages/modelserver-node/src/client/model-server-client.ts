@@ -170,7 +170,7 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
             port: this.upstreamConnectionConfig.serverPort,
             path: this.upstreamConnectionConfig.baseURL
         });
-        return this.delegate.initialize(this._baseURL.toString(), DEFAULT_FORMAT);
+        return this.delegate.initialize(this._baseURL, DEFAULT_FORMAT);
     }
 
     async openTransaction(modelUri: URI): Promise<TransactionContext> {
@@ -182,7 +182,7 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
 
         const clientID = uuid();
 
-        return axios.post(this.makeURL('transaction', { modeluri: modelUri.toString() }), { data: clientID }).then(response => {
+        return axios.post(this.makeURL('transaction', modelUri), { data: clientID }).then(response => {
             const { uri: transactionURI } = (response.data as CreateTransactionResponseBody).data;
             const result = new DefaultTransactionContext(
                 transactionURI,
@@ -202,10 +202,10 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
     }
 
-    protected makeURL(path: string, queryParameters?: any): string {
+    protected makeURL(path: string, modeluri: URI): string {
         const uri = this._baseURL.clone();
-        uri.path(URI.joinPaths(uri.path(), path).toString());
-        uri.addQuery(queryParameters);
+        path.split('/').forEach(seg => uri.segment(seg));
+        uri.addQuery('modeluri', modeluri);
         return uri.toString();
     }
 
@@ -222,9 +222,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.getAll(format);
     }
-    get(modeluri: string, format?: Format): Promise<AnyObject>;
-    get<M>(modeluri: string, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
-    get<M>(modeluri: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
+    get(modeluri: URI, format?: Format): Promise<AnyObject>;
+    get<M>(modeluri: URI, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
+    get<M>(modeluri: URI, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
         if (!typeGuard) {
             return this.delegate.get(modeluri, format);
         }
@@ -233,12 +233,12 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.get(modeluri, typeGuard);
     }
-    getModelUris(): Promise<string[]> {
+    getModelUris(): Promise<URI[]> {
         return this.delegate.getModelUris();
     }
-    getElementById(modeluri: string, elementid: string, format?: Format): Promise<AnyObject>;
-    getElementById<M>(modeluri: string, elementid: string, typeGuard: TypeGuard<M>): Promise<M>;
-    getElementById<M>(modeluri: string, elementid: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
+    getElementById(modeluri: URI, elementid: string, format?: Format): Promise<AnyObject>;
+    getElementById<M>(modeluri: URI, elementid: string, typeGuard: TypeGuard<M>): Promise<M>;
+    getElementById<M>(modeluri: URI, elementid: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
         if (!typeGuard) {
             return this.delegate.getElementById(modeluri, elementid, format);
         }
@@ -247,9 +247,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.getElementById(modeluri, elementid, typeGuard, format);
     }
-    getElementByName(modeluri: string, elementname: string, format?: Format): Promise<AnyObject>;
-    getElementByName<M>(modeluri: string, elementname: string, typeGuard: TypeGuard<M>): Promise<M>;
-    getElementByName<M>(modeluri: string, elementname: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
+    getElementByName(modeluri: URI, elementname: string, format?: Format): Promise<AnyObject>;
+    getElementByName<M>(modeluri: URI, elementname: string, typeGuard: TypeGuard<M>): Promise<M>;
+    getElementByName<M>(modeluri: URI, elementname: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
         if (!typeGuard) {
             return this.delegate.getElementByName(modeluri, elementname, format);
         }
@@ -258,15 +258,15 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.getElementByName(modeluri, elementname, typeGuard, format);
     }
-    delete(modeluri: string): Promise<boolean> {
+    delete(modeluri: URI): Promise<boolean> {
         return this.delegate.delete(modeluri);
     }
-    close(modeluri: string): Promise<boolean> {
+    close(modeluri: URI): Promise<boolean> {
         return this.delegate.close(modeluri);
     }
-    create(modeluri: string, model: string | AnyObject, format?: Format): Promise<AnyObject>;
-    create<M>(modeluri: string, model: string | AnyObject, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
-    create<M>(modeluri: string, model: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
+    create(modeluri: URI, model: string | AnyObject, format?: Format): Promise<AnyObject>;
+    create<M>(modeluri: URI, model: string | AnyObject, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
+    create<M>(modeluri: URI, model: string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
         if (!typeGuard) {
             return this.delegate.create(modeluri, model, format);
         }
@@ -275,9 +275,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.create(modeluri, model, typeGuard, format);
     }
-    update(modeluri: string, model: AnyObject | string, format?: Format): Promise<AnyObject>;
-    update<M>(modeluri: string, model: AnyObject | string, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
-    update<M>(modeluri: string, model: AnyObject | string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
+    update(modeluri: URI, model: AnyObject | string, format?: Format): Promise<AnyObject>;
+    update<M>(modeluri: URI, model: AnyObject | string, typeGuard: TypeGuard<M>, format?: Format): Promise<M>;
+    update<M>(modeluri: URI, model: AnyObject | string, typeGuard?: Format | TypeGuard<M>, format?: Format): Promise<AnyObject | M> {
         if (!typeGuard) {
             return this.delegate.update(modeluri, model, format);
         }
@@ -286,19 +286,19 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.update(modeluri, model, typeGuard, format);
     }
-    save(modeluri: string): Promise<boolean> {
+    save(modeluri: URI): Promise<boolean> {
         return this.delegate.save(modeluri);
     }
     saveAll(): Promise<boolean> {
         return this.delegate.saveAll();
     }
-    validate(modeluri: string): Promise<Diagnostic> {
+    validate(modeluri: URI): Promise<Diagnostic> {
         return this.delegate.validate(modeluri);
     }
-    getValidationConstraints(modeluri: string): Promise<string> {
+    getValidationConstraints(modeluri: URI): Promise<string> {
         return this.delegate.getValidationConstraints(modeluri);
     }
-    getTypeSchema(modeluri: string): Promise<string> {
+    getTypeSchema(modeluri: URI): Promise<string> {
         return this.delegate.getTypeSchema(modeluri);
     }
     getUiSchema(schemaname: string): Promise<string> {
@@ -310,9 +310,9 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     ping(): Promise<boolean> {
         return this.delegate.ping();
     }
-    edit(modeluri: string, patch: Operation | Operation[], format?: Format): Promise<ModelUpdateResult>;
-    edit(modeluri: string, command: ModelServerCommand, format?: Format): Promise<ModelUpdateResult>;
-    edit(modeluri: string, patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
+    edit(modeluri: URI, patch: Operation | Operation[], format?: Format): Promise<ModelUpdateResult>;
+    edit(modeluri: URI, command: ModelServerCommand, format?: Format): Promise<ModelUpdateResult>;
+    edit(modeluri: URI, patchOrCommand: Operation | Operation[] | ModelServerCommand): Promise<ModelUpdateResult> {
         if (patchOrCommand instanceof ModelServerCommand) {
             return this.delegate.edit(modeluri, patchOrCommand);
         }
@@ -321,20 +321,20 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
         }
         return this.delegate.edit(modeluri, patchOrCommand);
     }
-    undo(modeluri: string): Promise<ModelUpdateResult> {
+    undo(modeluri: URI): Promise<ModelUpdateResult> {
         return this.delegate.undo(modeluri);
     }
-    redo(modeluri: string): Promise<ModelUpdateResult> {
+    redo(modeluri: URI): Promise<ModelUpdateResult> {
         return this.delegate.redo(modeluri);
     }
-    subscribe(modeluri: string, listener: SubscriptionListener, options?: SubscriptionOptions): SubscriptionListener {
+    subscribe(modeluri: URI, listener: SubscriptionListener, options?: SubscriptionOptions): SubscriptionListener {
         return this.delegate.subscribe(modeluri, listener, options);
     }
-    send(modelUri: string, message: ModelServerMessage<unknown>): void {
-        return this.delegate.send(modelUri, message);
+    send(modeluri: URI, message: ModelServerMessage<unknown>): void {
+        return this.delegate.send(modeluri, message);
     }
-    unsubscribe(modelUri: string): void {
-        return this.delegate.unsubscribe(modelUri);
+    unsubscribe(modeluri: URI): void {
+        return this.delegate.unsubscribe(modeluri);
     }
 }
 
@@ -681,7 +681,7 @@ class DefaultTransactionContext implements TransactionContext {
     protected message(type: MessageBody['type'], data: unknown = {}): MessageBody {
         return {
             type,
-            modelUri: this.modelURI.toString(),
+            modeluri: this.modelURI,
             data
         };
     }

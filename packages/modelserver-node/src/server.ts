@@ -17,6 +17,7 @@ import * as expressWS from 'express-ws';
 import { WebsocketRequestHandler } from 'express-ws';
 import * as http from 'http';
 import { inject, injectable, multiInject, named, optional, postConstruct } from 'inversify';
+import * as URI from 'urijs';
 import * as WebSocket from 'ws';
 
 import { InternalModelServerClientApi } from './client/model-server-client';
@@ -138,7 +139,8 @@ export class ModelServer {
         // Use provided after-middlewares that are applicable globally
         this.middlewareProviders.flatMap(p => p.getAfterMiddlewares?.(app) ?? []).forEach(mw => app.use(mw));
 
-        const upstream = axios.create({ baseURL: `http://localhost:${upstreamPort}/` });
+        const baseURL = new URI({ protocol: 'http', hostname: 'localhost', port: upstreamPort });
+        const upstream = axios.create({ baseURL: baseURL.toString() });
 
         app.all('*', this.forward(upstream));
         app.ws('*', this.forwardWS(upstream));
