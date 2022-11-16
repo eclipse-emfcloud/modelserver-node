@@ -19,7 +19,6 @@ import {
     ModelServerCommand,
     ModelServerCommandPackage,
     ModelServerMessage,
-    ModelServerNotification,
     ModelServerObject,
     ModelUpdateResult,
     ServerConfiguration,
@@ -88,8 +87,9 @@ export interface TransactionContext extends Executor, EditTransaction {
 /**
  * Protocol of messages sent to and received from the _Model Server_ on a transaction socket.
  */
-export interface ModelServerTransactionMessage<T = unknown> extends ModelServerMessage<T>, ModelServerNotification {
+export interface ModelServerTransactionMessage<T = unknown> extends ModelServerMessage<T> {
     type: 'execute' | 'close' | 'roll-back' | 'incrementalUpdate' | 'success';
+    modeluri: string;
 }
 
 export type MessageBody = ModelServerTransactionMessage;
@@ -681,7 +681,7 @@ class DefaultTransactionContext implements TransactionContext {
     protected message(type: MessageBody['type'], data: unknown = {}): MessageBody {
         return {
             type,
-            modeluri: this.modelURI,
+            modeluri: this.modelURI.toString(),
             data
         };
     }
