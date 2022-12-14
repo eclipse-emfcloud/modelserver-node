@@ -19,7 +19,7 @@ This intercepting handler can:
 - handle the request by executing custom behaviour and not forwarding
   - e.g. the [Validation RouteProvider](./src/routes/validation.ts)) delegates to the validation manager and stops the chain there
 - handle the request by executing custom behaviour and forwarding to the next upstream
-  - e.g. the [UndoRedo RouteProvider](./src/routes/undo-redo.ts)) delegates to the validation manager and stops the chain
+  - e.g. executing custom behaviour and then forward to the next upstream via `return next();` (see also example below)
 - simply forward to the next upstream without any custom behaviour
   - e.g. the [ModelElement RouteProvider](./src/routes/modelelement.ts)) forwards directly to the next upstream via `return next();`
   - To only forward with a validated model uri, you may use the utility forwarding function `forwardWithValidatedModelUri`.
