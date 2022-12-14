@@ -9,8 +9,22 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { AnyObject, Format, ModelUpdateResult } from '@eclipse-emfcloud/modelserver-client';
-import { Response } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ServerResponse } from 'http';
+import * as URI from 'urijs';
+
+import { getValidatedModelURI } from '../client/uri-utils';
+
+/**
+ * Query parameters for requests to endpoints that require a `modeluri` parameter.
+ */
+export interface ModelQuery {
+    /** The model URI query parameter. */
+    modeluri: string;
+}
+
+export type ModelRequestHandler<T = ModelQuery> = RequestHandler<unknown, any, any, T, Record<string, any>>;
+export type ModelRequest<T = ModelQuery> = Request<unknown, any, any, T, Record<string, any>>;
 
 /**
  * Return an uri related error response to the upstream client.
@@ -40,6 +54,42 @@ export function respondUriError(res: ServerResponse, error: any): boolean {
 }
 
 /**
+ * Wrapper for route providers that provides a validated model uri to the endpoint handler.
+ * If the validation fails, an error response is reported to the upstream client.
+ *
+ * @param req the incoming request
+ * @param res the upstream response stream
+ * @param endpointHandler the handler to execute with the validated model uri
+ */
+export function withValidatedModelUri(req: ModelRequest, res: Response, endpointHandler: (modeluri: URI) => void): void {
+    try {
+        const validatedModelUri = getValidatedModelURI(req.query.modeluri);
+        if (!validatedModelUri) {
+            throw new Error('Validated Model URI is absent or empty.');
+        }
+        // if model uri was successfully validated, override query param in case request is forwarded in handler
+        req.query.modeluri = validatedModelUri.toString();
+        // execute handler
+        endpointHandler(validatedModelUri);
+    } catch (error) {
+        handleUriError(res)(error);
+        return;
+    }
+}
+
+/**
+ * Utility function for a default request handler that forwards the request to upstream with a validated model uri.
+ */
+export function forwardWithValidatedModelUri(): ModelRequestHandler {
+    return async (req: ModelRequest, res: Response, next: NextFunction) => {
+        withValidatedModelUri(req, res, async _validatedModelUri =>
+            // forward request to upstream with validated model uri
+            next()
+        );
+    };
+}
+
+/**
  * Return an error response to the upstream client.
  *
  * @param res the upstream response stream
@@ -66,15 +116,16 @@ export function respondError(res: ServerResponse, error: any): boolean {
     return false;
 }
 
+/** a function that relays the downstream response result to the upstream client */
+type RelayDownstreamFunction = <T extends boolean | string | ModelUpdateResult | AnyObject>(downstream: T) => T;
+
 /**
  * Relay a downstream response to the upstream client.
  *
  * @param upstream the upstream response stream
  * @returns a function that relays the downstream response result to the upstream client
  */
-export function relay(
-    upstream: Response<any, Record<string, any>>
-): <T extends boolean | string | ModelUpdateResult | AnyObject>(downstream: T) => T {
+export function relay(upstream: ServerResponse): RelayDownstreamFunction {
     const writeHead = (isError = false): unknown =>
         upstream.writeHead(isError ? 500 : 200, isError ? 'Internal Server Error' : 'OK', { 'Content-Type': 'application/json' });
 

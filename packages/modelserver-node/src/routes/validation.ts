@@ -9,22 +9,13 @@
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
 import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { Request, RequestHandler, Response } from 'express';
+import { Response } from 'express';
 import { inject, injectable, named } from 'inversify';
-import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
 import { ValidationManager } from '../services/validation-manager';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
-import { handleError, relay } from './routes';
-
-/**
- * Query parameters for the `GET` request on the `validation` endpoint.
- */
-interface ValidationGetQuery {
-    /** The model URI to edit. */
-    modeluri: string;
-}
+import { handleError, ModelRequest, ModelRequestHandler, relay, withValidatedModelUri } from './route-utils';
 
 /**
  * Custom routing of requests on the `/api/v2/validation` endpoint.
@@ -57,18 +48,11 @@ export class ValidationRoutes implements RouteProvider {
      *
      * @returns the validation intercept handler
      */
-    protected interceptValidationGet(): RequestHandler<unknown, any, any, ValidationGetQuery, Record<string, any>> {
-        return async (
-            req: Request<unknown, any, any, ValidationGetQuery, Record<string, any>>,
-            res: Response<any, Record<string, any>>
-        ) => {
-            const modelURI = req.query.modeluri?.trim();
-            if (!modelURI || modelURI === '') {
-                handleError(res)('Model URI parameter is absent or empty.');
-                return;
-            }
-
-            this.validationManager.validate(new URI(modelURI)).then(relay(res)).catch(handleError(res));
+    protected interceptValidationGet(): ModelRequestHandler {
+        return async (req: ModelRequest, res: Response) => {
+            withValidatedModelUri(req, res, async validatedModelUri => {
+                this.validationManager.validate(validatedModelUri).then(relay(res)).catch(handleError(res));
+            });
         };
     }
 }

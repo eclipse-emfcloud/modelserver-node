@@ -12,6 +12,7 @@
 import { RouteProvider } from '@eclipse-emfcloud/modelserver-plugin-ext';
 import { ContainerModule } from 'inversify';
 
+import { ModelElementRoutes } from './modelelement';
 import { ModelsRoutes } from './models';
 import { SubscriptionRoutes } from './subscription';
 import { UndoRedoRoutes } from './undo-redo';
@@ -19,6 +20,7 @@ import { ValidationRoutes } from './validation';
 
 export default new ContainerModule(bind => {
     bind(RouteProvider).to(ModelsRoutes);
+    bind(RouteProvider).to(ModelElementRoutes);
     bind(RouteProvider).to(ValidationRoutes);
     bind(RouteProvider).to(UndoRedoRoutes);
     bind(RouteProvider).to(SubscriptionRoutes);

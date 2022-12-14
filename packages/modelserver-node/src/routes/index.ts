@@ -8,8 +8,4 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR MIT
  *******************************************************************************/
-
-export * from './di';
-export * from './routes';
-export * from './server';
-export * from './server-module';
+export * from './route-utils';

@@ -18,32 +18,22 @@ import {
     SetCommand
 } from '@eclipse-emfcloud/modelserver-client';
 import { Logger, RouteProvider, RouterFactory } from '@eclipse-emfcloud/modelserver-plugin-ext';
-import { Request, RequestHandler, Response } from 'express';
+import { Response } from 'express';
 import { Operation } from 'fast-json-patch';
 import { inject, injectable, named } from 'inversify';
 import * as URI from 'urijs';
 
 import { ExecuteMessageBody, InternalModelServerClientApi, isModelServerCommand } from '../client/model-server-client';
-import { validateModelURI } from '../client/uri-utils';
 import { EditService } from '../services/edit-service';
 import { ValidationManager } from '../services/validation-manager';
-import { handleError, handleUriError, relay, validateFormat } from './routes';
+import { handleError, ModelQuery, ModelRequest, ModelRequestHandler, relay, validateFormat, withValidatedModelUri } from './route-utils';
 
 /**
  * Query parameters for the `POST` or `PUT` request on the `models` endpoint.
  */
-interface ModelsPostPutQuery {
-    /** The model URI to create or update. */
-    modeluri: string;
+interface ModelsPostPutQuery extends ModelQuery {
+    /** The optional format to query the model. */
     format?: string;
-}
-
-/**
- * Query parameters for the `PATCH` request on the `models` endpoint.
- */
-interface ModelsPatchQuery {
-    /** The model URI to patch. */
-    modeluri: string;
 }
 
 /**
@@ -79,33 +69,25 @@ export class ModelsRoutes implements RouteProvider {
      *
      * @returns the models intercept handler
      */
-    protected interceptModelsPostPut(): RequestHandler<unknown, any, any, ModelsPostPutQuery, Record<string, any>> {
-        return async (
-            req: Request<unknown, any, any, ModelsPostPutQuery, Record<string, any>>,
-            res: Response<any, Record<string, any>>
-        ) => {
-            let modeluri: URI;
-            try {
-                modeluri = validateModelURI(req.query.modeluri);
-            } catch (error) {
-                handleUriError(res)(error);
-                return;
-            }
-            const format = validateFormat(req.query.format);
+    protected interceptModelsPostPut(): ModelRequestHandler<ModelsPostPutQuery> {
+        return async (req: ModelRequest<ModelsPostPutQuery>, res: Response) => {
+            withValidatedModelUri(req, res, async validatedModelUri => {
+                const format = validateFormat(req.query.format);
 
-            const model = asModel(req.body?.data);
-            if (!model) {
-                handleError(res)('Request body is not a model.');
-                return;
-            }
+                const model = asModel(req.body?.data);
+                if (!model) {
+                    handleError(res)('Request body is not a model.');
+                    return;
+                }
 
-            const isCreate = req.method.toUpperCase() === 'POST';
-            this.logger.debug(`Delegating ${isCreate ? 'creation' : 'update'} of ${modeluri.toString()}.`);
-            const delegated = isCreate //
-                ? this.modelServerClient.create(modeluri, model, format)
-                : this.modelServerClient.update(modeluri, model, format);
+                const isCreate = req.method.toUpperCase() === 'POST';
+                this.logger.debug(`Delegating ${isCreate ? 'creation' : 'update'} of ${validatedModelUri.toString()}.`);
+                const delegated = isCreate //
+                    ? this.modelServerClient.create(validatedModelUri, model, format)
+                    : this.modelServerClient.update(validatedModelUri, model, format);
 
-            delegated.then(this.performModelValidation(modeluri)).then(relay(res)).catch(handleError(res));
+                delegated.then(this.performModelValidation(validatedModelUri)).then(relay(res)).catch(handleError(res));
+            });
         };
     }
 
@@ -116,28 +98,22 @@ export class ModelsRoutes implements RouteProvider {
      *
      * @returns the edit-command intercept handler
      */
-    protected interceptModelsPatch(): RequestHandler<unknown, any, any, ModelsPatchQuery, Record<string, any>> {
-        return async (req: Request<unknown, any, any, ModelsPatchQuery, Record<string, any>>, res: Response<any, Record<string, any>>) => {
-            let modeluri: URI;
-            try {
-                modeluri = validateModelURI(req.query.modeluri);
-            } catch (error) {
-                handleUriError(res)(error);
-                return;
-            }
+    protected interceptModelsPatch(): ModelRequestHandler {
+        return async (req: ModelRequest, res: Response) => {
+            withValidatedModelUri(req, res, async validatedModelUri => {
+                const message = req.body?.data;
+                if (message && ExecuteMessageBody.isPatch(message)) {
+                    return this.forwardEdit(validatedModelUri, message.data, res);
+                }
 
-            const message = req.body?.data;
-            if (message && ExecuteMessageBody.isPatch(message)) {
-                return this.forwardEdit(modeluri, message.data, res);
-            }
+                const command = asModelServerCommand(message?.data);
+                if (!command) {
+                    handleError(res)('Request body is not a ModelServerCommand.');
+                    return;
+                }
 
-            const command = asModelServerCommand(message?.data);
-            if (!command) {
-                handleError(res)('Request body is not a ModelServerCommand.');
-                return;
-            }
-
-            return this.forwardEdit(modeluri, command, res);
+                return this.forwardEdit(validatedModelUri, command, res);
+            });
         };
     }
 
