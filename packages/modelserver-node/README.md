@@ -8,10 +8,13 @@ See the [parent readme](../../README.md) for details of how to set up and build 
 
 ## Routing Mechanism
 
-Route providers create interceptors for endpoints (`GET/POST/PUT..`) via the `routerfactory`:
+Route providers create interceptors for endpoints (`GET/POST/PUT..`) via the `routerFactory`:
 
 ```ts
-routerFactory('/api/v2/my-endpoint', myInterceptingHandler().bind(this));
+const router = routerFactory('/api/v2');
+router.get('/my-endpoint', myInterceptingHandler());
+// OR
+routerFactory('/api/v2(my-endpoint').get('/', myInterceptingHandler());
 ```
 
 This intercepting handler can:

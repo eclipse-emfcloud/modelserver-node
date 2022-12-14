@@ -35,6 +35,7 @@ export class ModelElementRoutes implements RouteProvider {
         /**
          * Create a `GET` request handler for the `/api/v2/modelelement` endpoint
          */
-        routerFactory('/api/v2/modelelement', forwardWithValidatedModelUri().bind(this));
+        const router = routerFactory('/api/v2');
+        router.get('/modelelement', forwardWithValidatedModelUri());
     }
 }
