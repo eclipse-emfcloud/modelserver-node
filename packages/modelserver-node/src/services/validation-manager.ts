@@ -14,7 +14,7 @@ import { inject, injectable, named, postConstruct } from 'inversify';
 import * as URI from 'urijs';
 
 import { InternalModelServerClientApi } from '../client/model-server-client';
-import { validateModelURI } from '../client/uri-utils';
+import { getValidatedModelUri } from '../client/uri-utils';
 import { JSONSocket } from '../client/web-socket-utils';
 import { ValidationProviderRegistry } from '../validation-provider-registry';
 import { SubscriptionManager } from './subscription-manager';
@@ -43,7 +43,7 @@ export class ValidationManager {
     initialize(): void {
         this.subscriptionManager.addSubscribedListener((client, params) => {
             if (params.livevalidation) {
-                this.initializeLiveValidation(client, validateModelURI(params.modeluri));
+                this.initializeLiveValidation(client, getValidatedModelUri(params.modeluri));
             }
         });
     }

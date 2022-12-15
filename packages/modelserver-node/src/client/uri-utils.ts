@@ -16,12 +16,27 @@ import * as URI from 'urijs';
  * @param modeluri a modeluri string query parameter
  * @returns the transformed valid URI, throws an Error otherwise
  */
-export function validateModelURI(modeluri?: string): URI {
-    if (!modeluri || modeluri === '') {
-        throw new Error('Model URI parameter is absent or empty.');
+export function getValidatedModelUri(queryModelUri?: string): URI {
+    if (!queryModelUri || queryModelUri === '') {
+        throw new Error('Model uri parameter is absent or empty.');
     }
-    const modelURIParts = URI.parse(modeluri);
-    // Java Model Server does not deal correctly with full absolute file path
-    const modelURI = new URI(modelURIParts).protocol('');
-    return modelURI;
+    if (typeof queryModelUri !== 'string') {
+        throw new Error(`Incorrect query model uri parameter: ${queryModelUri}`);
+    }
+    return getNormalizedUri(queryModelUri);
+}
+
+/**
+ * Returns the given uri string as normalized URI object
+ * @param uriString the uri as string to be normalized
+ * @returns the normalized URI
+ */
+export function getNormalizedUri(uriString: string): URI {
+    return new URI(cleanWindowsPath(uriString));
+}
+
+function cleanWindowsPath(path: string): string {
+    // if the path begins with forward or backward slashes, followed by a drive letter,
+    // clean the slashes from the beginning of the string as it's not a valid absolute path in Windows
+    return path.replace(/^([\\/]+)([a-zA-Z]+:[\\/]+.*)/g, '$2');
 }

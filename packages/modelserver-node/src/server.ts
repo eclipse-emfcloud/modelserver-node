@@ -193,13 +193,17 @@ export class ModelServer {
                 return;
             }
 
+            // In case we modified the model uri query param, we do not want to use the old req.url here
+            // We use the original url and the query params to form the request url to query the upstream model server
+            const originalURL = req.url.split('?')[0];
             const relayReq: AxiosRequestConfig = {
-                url: req.url,
+                url: originalURL,
+                params: req.query,
                 method: req.method.toUpperCase() as Method,
                 data: req.body
             };
 
-            this.logger.debug(`Forwarding ${req.method} request on ${req.url} to Upstream Model Server.`);
+            this.logger.debug(`Forwarding ${req.method} request on ${relayReq.url} to Upstream Model Server.`);
 
             upstream
                 .request(relayReq)
