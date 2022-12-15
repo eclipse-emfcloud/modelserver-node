@@ -15,6 +15,7 @@ import { inject, injectable, named } from 'inversify';
 import { ParsedQs } from 'qs';
 import * as WebSocket from 'ws';
 
+import { getValidatedModelUri } from '../client/uri-utils';
 import { WSUpgradeRequest } from '../client/web-socket-utils';
 import { SubscriptionManager } from '../services/subscription-manager';
 
@@ -58,16 +59,18 @@ export class SubscriptionRoutes implements RouteProvider {
      */
     protected interceptSubscribeWS(): WebsocketRequestHandler {
         return (ws: WebSocket, req: WSUpgradeRequest) => {
-            const subscriptionParams = parseQuery(req.query);
-            const { modeluri } = subscriptionParams;
-
-            if (!modeluri || modeluri === '') {
-                ws.close(1001, 'Model URI parameter is absent or empty.');
+            try {
+                const subscriptionParams = parseQuery(req.query);
+                const validatedModelUri = getValidatedModelUri(subscriptionParams.modeluri);
+                if (!validatedModelUri) {
+                    throw new Error('Validated Model URI is absent or empty.');
+                }
+                const originalURL = WSUpgradeRequest.getOriginalURL(req).split('?')[0];
+                this.subscriptionManager.addSubscription(ws, originalURL, subscriptionParams);
+            } catch (error) {
+                ws.close(1001, error.message || 'Model URI parameter is absent or empty.');
                 return;
             }
-
-            const originalURL = WSUpgradeRequest.getOriginalURL(req).split('?')[0];
-            this.subscriptionManager.addSubscription(ws, originalURL, subscriptionParams);
         };
     }
 }

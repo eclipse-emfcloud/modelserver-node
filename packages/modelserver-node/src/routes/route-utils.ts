@@ -13,7 +13,7 @@ import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ServerResponse } from 'http';
 import * as URI from 'urijs';
 
-import { getValidatedModelURI } from '../client/uri-utils';
+import { getValidatedModelUri } from '../client/uri-utils';
 
 /**
  * Query parameters for requests to endpoints that require a `modeluri` parameter.
@@ -63,7 +63,7 @@ export function respondUriError(res: ServerResponse, error: any): boolean {
  */
 export function withValidatedModelUri(req: ModelRequest, res: Response, endpointHandler: (modeluri: URI) => void): void {
     try {
-        const validatedModelUri = getValidatedModelURI(req.query.modeluri);
+        const validatedModelUri = getValidatedModelUri(req.query.modeluri);
         if (!validatedModelUri) {
             throw new Error('Validated Model URI is absent or empty.');
         }

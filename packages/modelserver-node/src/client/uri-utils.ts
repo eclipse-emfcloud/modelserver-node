@@ -16,7 +16,7 @@ import * as URI from 'urijs';
  * @param modeluri a modeluri string query parameter
  * @returns the transformed valid URI, throws an Error otherwise
  */
-export function getValidatedModelURI(queryModelUri?: string): URI {
+export function getValidatedModelUri(queryModelUri?: string): URI {
     if (!queryModelUri || queryModelUri === '') {
         throw new Error('Model uri parameter is absent or empty.');
     }
@@ -32,7 +32,7 @@ export function getValidatedModelURI(queryModelUri?: string): URI {
  * @returns the normalized URI
  */
 export function getNormalizedUri(uriString: string): URI {
-    return new URI(cleanWindowsPath(uriString)).normalize();
+    return new URI(cleanWindowsPath(uriString));
 }
 
 function cleanWindowsPath(path: string): string {

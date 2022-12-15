@@ -37,6 +37,7 @@ import * as WebSocket from 'ws';
 import { CommandProviderRegistry } from '../command-provider-registry';
 import { TriggerProviderRegistry } from '../trigger-provider-registry';
 import { CompletablePromise } from './promise-utils';
+import { getValidatedModelUri } from './uri-utils';
 import { WebSocketMessageAcceptor } from './web-socket-utils';
 
 export const UpstreamConnectionConfig = Symbol('UpstreamConnectionConfig');
@@ -174,25 +175,32 @@ export class InternalModelServerClient implements InternalModelServerClientApi {
     }
 
     async openTransaction(modelUri: URI): Promise<TransactionContext> {
-        const uriKey = modelUri.normalize().toString();
-        if (this.transactions.has(uriKey)) {
+        let validatedModelUri: URI;
+        try {
+            validatedModelUri = getValidatedModelUri(modelUri.toString());
+        } catch (error) {
+            this.logger.error(error);
+            return Promise.reject();
+        }
+        const validatedModelUriKey = validatedModelUri.toString();
+        if (this.transactions.has(validatedModelUriKey)) {
             // Open a nested transaction
-            return this.transactions.get(uriKey).openTransaction();
+            return this.transactions.get(validatedModelUriKey).openTransaction();
         }
 
         const clientID = uuid();
 
-        return axios.post(this.makeURL('transaction', modelUri), { data: clientID }).then(response => {
+        return axios.post(this.makeURL('transaction', validatedModelUri), { data: clientID }).then(response => {
             const { uri: transactionURI } = (response.data as CreateTransactionResponseBody).data;
             const result = new DefaultTransactionContext(
                 transactionURI,
-                modelUri,
+                validatedModelUri,
                 this.commandProviderRegistry,
                 this.triggerProviderRegistry,
                 this.logger
             );
-            this.transactions.set(uriKey, result);
-            return result.open(tc => this.closeTransaction(modelUri, tc));
+            this.transactions.set(validatedModelUriKey, result);
+            return result.open(tc => this.closeTransaction(validatedModelUri, tc));
         });
     }
 
