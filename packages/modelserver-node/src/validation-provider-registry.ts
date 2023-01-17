@@ -133,7 +133,7 @@ function multiValidator(providers: ValidationProvider[]): Validator {
 
 function summarize(model: ModelServerObjectV2, modelURI: URI, diagnostics: Diagnostic[]): Diagnostic {
     const result = Diagnostic.merge(...diagnostics);
-    if (result.severity > OK) {
+    if (result.children.length > 0 && result.severity > OK) {
         result.message = `Diagnosis of ${modelURI.toString()}`;
         result.id = '/';
     }
