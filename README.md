@@ -1,4 +1,4 @@
-# Node.js Model Server ![build-status](https://img.shields.io/jenkins/build?jobUrl=https://ci.eclipse.org/emfcloud/job/eclipse-emfcloud/job/modelserver-node/job/main/)
+# Eclipse EMF.cloud Node.js Model Server ![build-status](https://img.shields.io/jenkins/build?jobUrl=https://ci.eclipse.org/emfcloud/job/eclipse-emfcloud/job/modelserver-node/job/main/)
 
 The Node.js _Model Server_ is a façade in front of the Java _Model Server_ that provides an extensible environment for Javascript-based _plug-ins_.
 Plug-in contributions are supported for
